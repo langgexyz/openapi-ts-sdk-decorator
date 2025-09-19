@@ -46,8 +46,7 @@
     "type-check": "tsc --noEmit",
     "type-check:watch": "tsc --noEmit --watch",
     "lint": "tsc --noEmit --strict",
-    "clean": "rm -rf dist node_modules/.cache",
-    "example": "tsc test-typescript-example.ts --experimentalDecorators --emitDecoratorMetadata && node test-typescript-example.js"
+    "clean": "rm -rf node_modules/.cache coverage"
   },
   "dependencies": {
     "class-transformer": "^0.5.1",
