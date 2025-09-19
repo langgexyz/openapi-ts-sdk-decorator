@@ -428,24 +428,3 @@ export function getRootUri(clientClass: any): string | null {
 export function getAllRootUriMappings(): Map<string, string> {
   return (globalThis as any)[GLOBAL_ROOT_URIS_KEY] || new Map();
 }
-
-/**
- * @Query 装饰器 - 标记参数为查询参数
- */
-export function Query(name?: string) {
-  return function(target: any, propertyKey: string | symbol, parameterIndex: number) {
-    // 这里可以存储查询参数的元数据
-    // 暂时作为占位符实现
-  };
-}
-
-/**
- * @Body 装饰器 - 标记参数为请求体
- */
-export function Body() {
-  return function(target: any, propertyKey: string | symbol, parameterIndex: number) {
-    // 这里可以存储请求体参数的元数据
-    // 暂时作为占位符实现
-  };
-}
-

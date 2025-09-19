@@ -48,12 +48,4 @@ export declare function getRootUri(clientClass: any): string | null;
  * 获取所有SDK到服务器的映射
  */
 export declare function getAllRootUriMappings(): Map<string, string>;
-/**
- * @Query 装饰器 - 标记参数为查询参数
- */
-export declare function Query(name?: string): (target: any, propertyKey: string | symbol, parameterIndex: number) => void;
-/**
- * @Body 装饰器 - 标记参数为请求体
- */
-export declare function Body(): (target: any, propertyKey: string | symbol, parameterIndex: number) => void;
 //# sourceMappingURL=decorators.d.ts.map

@@ -359,22 +359,4 @@ export function getRootUri(clientClass) {
 export function getAllRootUriMappings() {
     return globalThis[GLOBAL_ROOT_URIS_KEY] || new Map();
 }
-/**
- * @Query 装饰器 - 标记参数为查询参数
- */
-export function Query(name) {
-    return function (target, propertyKey, parameterIndex) {
-        // 这里可以存储查询参数的元数据
-        // 暂时作为占位符实现
-    };
-}
-/**
- * @Body 装饰器 - 标记参数为请求体
- */
-export function Body() {
-    return function (target, propertyKey, parameterIndex) {
-        // 这里可以存储请求体参数的元数据
-        // 暂时作为占位符实现
-    };
-}
 //# sourceMappingURL=decorators.js.map

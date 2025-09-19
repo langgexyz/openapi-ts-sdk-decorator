@@ -12,8 +12,6 @@ exports.RootUri = RootUri;
 exports.getAPIMethodsMetadata = getAPIMethodsMetadata;
 exports.getRootUri = getRootUri;
 exports.getAllRootUriMappings = getAllRootUriMappings;
-exports.Query = Query;
-exports.Body = Body;
 const openapi_ts_sdk_1 = require("openapi-ts-sdk");
 /**
  * 装饰器命名空间常量
@@ -367,23 +365,5 @@ function getRootUri(clientClass) {
  */
 function getAllRootUriMappings() {
     return globalThis[GLOBAL_ROOT_URIS_KEY] || new Map();
-}
-/**
- * @Query 装饰器 - 标记参数为查询参数
- */
-function Query(name) {
-    return function (target, propertyKey, parameterIndex) {
-        // 这里可以存储查询参数的元数据
-        // 暂时作为占位符实现
-    };
-}
-/**
- * @Body 装饰器 - 标记参数为请求体
- */
-function Body() {
-    return function (target, propertyKey, parameterIndex) {
-        // 这里可以存储请求体参数的元数据
-        // 暂时作为占位符实现
-    };
 }
 //# sourceMappingURL=decorators.js.map
