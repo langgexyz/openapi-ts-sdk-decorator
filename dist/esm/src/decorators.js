@@ -108,10 +108,10 @@ function validateStandardMethodSignature(path, method, target, propertyKey, desc
     }
     // 验证标准方法签名格式
     const pathParams = extractPathParameters(path);
-    // 分析参数类型
+    // 分析参数类型（基于运行时可获得的信息）
     const requestParams = [];
     const optionsParams = [];
-    const otherParams = [];
+    const pathParamsInSignature = [];
     params.forEach(param => {
         const cleanParam = param.trim();
         const paramName = cleanParam.split(':')[0].trim();
@@ -119,69 +119,48 @@ function validateStandardMethodSignature(path, method, target, propertyKey, desc
             // 任何以 ... 开头的参数都被认为是 options 参数
             optionsParams.push(cleanParam);
         }
-        else if (cleanParam.includes('Request')) {
-            // 包含 "Request" 的类型被认为是 request 参数
-            requestParams.push(cleanParam);
+        else if (pathParams.includes(paramName)) {
+            // 检查路径参数是否错误地出现在方法签名中
+            pathParamsInSignature.push(cleanParam);
         }
         else {
-            // 对于非路径参数的其他参数，也可能是错误命名的 request 参数
-            if (!pathParams.includes(paramName)) {
-                // 如果不是路径参数，很可能是应该叫 "request" 的参数
-                requestParams.push(cleanParam);
-            }
-            else {
-                otherParams.push(cleanParam);
-            }
+            // 非路径参数、非options参数 = 可能的 request 参数
+            requestParams.push(cleanParam);
         }
     });
     const errors = [];
     const suggestions = [];
     // 生成方法名对应的类型名（用于错误信息）
     const capitalizedMethodName = propertyKey.charAt(0).toUpperCase() + propertyKey.slice(1);
-    // 首先检查request参数数量（优先级最高）
+    // 1. 检查路径参数是否错误地出现在方法签名中
+    if (pathParamsInSignature.length > 0) {
+        errors.push(`路径参数 [${pathParamsInSignature.map(p => p.split(':')[0].trim()).join(', ')}] 不应该在方法签名中`);
+        suggestions.push(`使用 withParams() 在调用时提供路径参数，而不是在方法签名中定义`);
+    }
+    // 2. 检查 request 参数数量
     if (requestParams.length > 1) {
         errors.push(`只能有一个 request 参数，发现 ${requestParams.length} 个`);
+        suggestions.push(`合并为单个 request 对象: request: ${capitalizedMethodName}Request`);
     }
-    else if (requestParams.length === 1) {
-        const requestParam = requestParams[0];
-        // 检查是否有类型声明
-        if (!requestParam.includes(':')) {
-            errors.push(`request 参数必须有类型声明`);
-            suggestions.push(`建议格式: request: ${capitalizedMethodName}Request`);
-        }
-        else if (!requestParam.includes('Request')) {
-            // 如果有类型声明，检查类型是否以 "Request" 结尾
-            errors.push(`request 参数类型必须以 "Request" 结尾`);
-            suggestions.push(`建议格式: request: ${capitalizedMethodName}Request`);
-        }
-    }
-    else if (requestParams.length === 0 && otherParams.length === 0) {
-        // 如果没有任何非options参数，对于某些GET请求这是允许的
-        // 不报错
-    }
-    // 检查options参数格式
+    // 3. 检查 options 参数格式  
     if (optionsParams.length > 1) {
         errors.push(`只能有一个 ...options 参数，发现 ${optionsParams.length} 个`);
+        suggestions.push(`使用单个 rest 参数: ...options: APIOption[]`);
     }
-    // 检查是否有路径参数在方法签名中（不符合标准）
-    if (otherParams.length > 0) {
-        // 检查是否是路径参数
-        const possiblePathParams = otherParams.filter(param => {
-            const paramName = param.split(':')[0].trim().replace(/[?]$/, '');
-            return pathParams.includes(paramName);
-        });
-        if (possiblePathParams.length > 0) {
-            errors.push(`路径参数 [${possiblePathParams.map(p => p.split(':')[0].trim()).join(', ')}] 不应该在方法签名中`);
-            suggestions.push(`使用 withParams() 在调用时提供路径参数，而不是在方法签名中定义`);
-        }
-        // 检查其他非标准参数
-        const nonPathParams = otherParams.filter(param => {
-            const paramName = param.split(':')[0].trim().replace(/[?]$/, '');
-            return !pathParams.includes(paramName);
-        });
-        if (nonPathParams.length > 0) {
-            errors.push(`参数类型缺少类型声明或类型不以 "Request" 结尾: [${nonPathParams.join(', ')}]`);
-            suggestions.push(`请为参数添加类型声明，格式：request: ${capitalizedMethodName}Request`);
+    // 4. 验证整体参数结构（运行时可检查的部分）
+    const totalNonOptionsParams = requestParams.length + pathParamsInSignature.length;
+    // 检查参数总数是否合理
+    if (totalNonOptionsParams > 1) {
+        errors.push(`方法签名应该只有 request 参数和 ...options 参数`);
+        suggestions.push(`标准格式: async ${propertyKey}(request: ${capitalizedMethodName}Request, ...options: APIOption[])`);
+    }
+    // 5. 对于有 request 参数的情况，建议使用标准命名
+    if (requestParams.length === 1) {
+        const requestParam = requestParams[0];
+        const paramName = requestParam.split(':')[0].trim();
+        // 建议使用 "request" 作为参数名（但不强制要求）
+        if (paramName !== 'request') {
+            suggestions.push(`建议使用标准参数名: request: ${capitalizedMethodName}Request（当前: ${paramName}）`);
         }
     }
     // 如果有错误，提供完整的错误信息
@@ -200,9 +179,9 @@ function validateStandardMethodSignature(path, method, target, propertyKey, desc
             `📚 说明:\n` +
             `   • 路径参数通过 withParams() 在调用时提供\n` +
             `   • 方法只接受 request 对象和 ...options 参数\n` +
-            `   • request 参数类型必须以 "Request" 结尾\n` +
             `   • 建议格式：request: ${capitalizedMethodName}Request\n` +
-            `   • 返回类型必须是 Promise<${responseTypeName}>\n\n` +
+            `   • 返回类型：Promise<${responseTypeName}>\n` +
+            `   • 注意：类型检查在 TypeScript 编译时进行\n\n` +
             (suggestions.length > 0 ? `🔧 建议:\n${suggestions.map(s => `   • ${s}`).join('\n')}` : ''));
     }
 }
