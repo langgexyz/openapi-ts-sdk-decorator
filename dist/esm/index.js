@@ -12,6 +12,8 @@ export * from './src/decorators';
 export * from './src/client';
 // Export validation decorators (TypeScript 5.x compatible)
 export * from './src/validation';
+// Export configuration API
+export { isValidationEnabled, setValidationEnabled } from './src/config';
 // Re-export commonly used types from dependencies
 export { HttpMethod } from 'openapi-ts-sdk';
 //# sourceMappingURL=index.js.map

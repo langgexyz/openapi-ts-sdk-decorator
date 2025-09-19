@@ -13,6 +13,7 @@ exports.getAPIMethodsMetadata = getAPIMethodsMetadata;
 exports.getRootUri = getRootUri;
 exports.getAllRootUriMappings = getAllRootUriMappings;
 const openapi_ts_sdk_1 = require("openapi-ts-sdk");
+const config_1 = require("./config");
 /**
  * 装饰器命名空间常量
  */
@@ -49,6 +50,10 @@ function extractPathParameters(path) {
  * @param descriptor 属性描述符（可能包含方法函数）
  */
 function validateStandardMethodSignature(path, method, target, propertyKey, descriptor) {
+    // 🚀 检查开关：如果禁用验证，直接返回
+    if (!(0, config_1.isValidationEnabled)()) {
+        return;
+    }
     // 获取方法的参数信息
     let methodFunction;
     if (descriptor && descriptor.value && typeof descriptor.value === 'function') {
@@ -228,6 +233,10 @@ function generateStandardSignature(methodName, pathParams, httpMethod = openapi_
  * @param decoratorName 装饰器名称（用于错误信息）
  */
 function validateDecoratorPath(path, decoratorName) {
+    // 🚀 检查开关：如果禁用验证，直接返回
+    if (!(0, config_1.isValidationEnabled)()) {
+        return;
+    }
     // 检查是否为空字符串
     if (path === '') {
         throw new Error(`@${decoratorName} 路径不能为空。` +

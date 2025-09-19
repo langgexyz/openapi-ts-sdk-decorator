@@ -7,6 +7,7 @@
  */
 
 import { HttpMethod } from 'openapi-ts-sdk';
+import { isValidationEnabled } from './config';
 
 /**
  * 装饰器命名空间常量
@@ -65,6 +66,11 @@ function extractPathParameters(path: string): string[] {
  * @param descriptor 属性描述符（可能包含方法函数）
  */
 function validateStandardMethodSignature(path: string, method: HttpMethod, target: any, propertyKey: string, descriptor?: PropertyDescriptor): void {
+  // 🚀 检查开关：如果禁用验证，直接返回
+  if (!isValidationEnabled()) {
+    return;
+  }
+  
   // 获取方法的参数信息
   let methodFunction: Function | undefined;
   
@@ -261,6 +267,10 @@ function generateStandardSignature(methodName: string, pathParams: string[], htt
  * @param decoratorName 装饰器名称（用于错误信息）
  */
 function validateDecoratorPath(path: string, decoratorName: string): void {
+  // 🚀 检查开关：如果禁用验证，直接返回
+  if (!isValidationEnabled()) {
+    return;
+  }
   
   // 检查是否为空字符串
   if (path === '') {
