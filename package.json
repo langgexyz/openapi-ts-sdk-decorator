@@ -2,20 +2,16 @@
   "name": "openapi-ts-sdk-decorator",
   "version": "1.0.3",
   "description": "OpenAPI TypeScript SDK decorators with TypeScript 5.x compatibility - provides decorator system and naming conventions for generated SDKs",
-  "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.js",
-  "types": "dist/types/index.d.ts",
+  "main": "index.ts",
+  "types": "index.ts",
   "exports": {
-    ".": {
-      "types": "./dist/types/index.d.ts",
-      "import": "./dist/esm/index.js",
-      "require": "./dist/cjs/index.js"
-    }
+    ".": "./index.ts"
   },
   "files": [
-    "dist/**/*",
     "src/**/*",
-    "README.md"
+    "index.ts",
+    "README.md",
+    "tsconfig.json"
   ],
   "keywords": [
     "openapi",
@@ -42,22 +38,16 @@
   "author": "langgexyz",
   "license": "MIT",
   "scripts": {
-    "build": "npm run build:cjs && npm run build:esm && npm run build:types",
-    "prebuild": "npm run clean",
-    "build:cjs": "tsc -p tsconfig.cjs.json",
-    "build:esm": "tsc -p tsconfig.esm.json",
-    "build:types": "tsc -p tsconfig.types.json",
-    "clean": "rm -rf dist",
-    "watch": "tsc --watch",
-    "test": "node tests/index.js",
-    "test:node": "node tests/index.js node",
-    "test:browser": "echo '🌐 请在浏览器中打开: tests/browser/index.html' && open tests/browser/index.html 2>/dev/null || echo '手动打开: tests/browser/index.html'",
-    "test:compatibility": "node tests/node/compatibility.test.js",
-    "test:naming": "node tests/node/naming-rules.test.js",
-    "test:function-naming": "node tests/node/function-naming.test.js",
-    "test:decorator-basics": "node tests/node/decorator-basics.test.js",
-    "test:rooturi": "node tests/node/rooturi-normalization.test.js",
-    "test:http-methods": "node tests/node/http-methods-validation.test.js"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:decorators": "jest tests/decorators",
+    "test:validation": "jest tests/validation",
+    "type-check": "tsc --noEmit",
+    "type-check:watch": "tsc --noEmit --watch",
+    "lint": "tsc --noEmit --strict",
+    "clean": "rm -rf dist node_modules/.cache",
+    "example": "tsc test-typescript-example.ts --experimentalDecorators --emitDecoratorMetadata && node test-typescript-example.js"
   },
   "dependencies": {
     "class-transformer": "^0.5.1",
@@ -73,6 +63,9 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/jest": "^29.5.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
     "typescript": "^5.3.0"
   }
 }

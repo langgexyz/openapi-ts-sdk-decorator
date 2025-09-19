@@ -1,24 +1,28 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "node",
-    "lib": ["ES2022", "DOM"],
-    "declaration": false,
-    "declarationMap": false,
-    "sourceMap": true,
-    "outDir": "dist/esm",
+    "target": "ES2020",
+    "module": "CommonJS", 
+    "lib": ["ES2020", "DOM"],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": false,
+    "noEmit": true,
     "rootDir": ".",
+    
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
+    "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "useDefineForClassFields": false,
-    "noImplicitAny": false,
+    
+    "noEmitOnError": true,
+    "noImplicitAny": true,
     "noImplicitReturns": true,
     "noImplicitThis": true,
     "noUnusedLocals": false,
@@ -26,6 +30,10 @@
     "strictNullChecks": true,
     "strictFunctionTypes": true,
     "strictPropertyInitialization": false,
+    
+    "removeComments": false,
+    "preserveConstEnums": true,
+    
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
@@ -33,12 +41,14 @@
   },
   "include": [
     "src/**/*",
-    "index.ts"
+    "index.ts",
+    "tests/**/*"
   ],
   "exclude": [
     "node_modules",
     "dist",
-    "tests",
-    "**/*.test.ts"
+    "coverage",
+    "**/*.js",
+    "jest.config.js"
   ]
 }
