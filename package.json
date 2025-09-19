@@ -1,0 +1,61 @@
+{
+  "name": "openapi-ts-sdk-decorator",
+  "version": "1.0.0",
+  "description": "OpenAPI TypeScript SDK decorators and shared validation rules - provides decorator system and naming conventions for generated SDKs",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist/**/*",
+    "src/**/*",
+    "README.md"
+  ],
+  "keywords": [
+    "openapi",
+    "typescript",
+    "sdk",
+    "decorator",
+    "validation",
+    "generator",
+    "http",
+    "rest",
+    "api"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/langgexyz/openapi-ts-sdk-decorator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/langgexyz/openapi-ts-sdk-decorator/issues"
+  },
+  "homepage": "https://github.com/langgexyz/openapi-ts-sdk-decorator#readme",
+  "author": "langgexyz",
+  "license": "MIT",
+  "scripts": {
+    "build": "npm run build:cjs && npm run build:esm && npm run build:types",
+    "prebuild": "npm run clean",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:types": "tsc -p tsconfig.types.json",
+    "clean": "rm -rf dist",
+    "watch": "tsc --watch",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "dependencies": {
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.0",
+    "openapi-ts-sdk": "https://github.com/langgexyz/openapi-ts-sdk.git#semver:^1.0.0",
+    "reflect-metadata": "^0.1.13"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
