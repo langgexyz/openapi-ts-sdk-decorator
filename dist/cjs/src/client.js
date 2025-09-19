@@ -43,27 +43,22 @@ exports.withParams = withParams;
  * 设置查询参数的 APIOption
  * 用于在 URL 后添加查询字符串
  *
- * @param query - 查询参数的键值对或查询字符串
+ * @param query - 查询参数的键值对
  * @returns APIOption 函数
  *
  * @example
  * withQuery({ page: '1', size: '10' })
  * // 结果：?page=1&size=10
  *
- * withQuery('page=1&size=10')
- * // 结果：?page=1&size=10
+ * withQuery({ filter: 'active', sort: 'name' })
+ * // 结果：?filter=active&sort=name
  */
 const withQuery = (query) => (config) => {
-    if (typeof query === 'string') {
-        config.query = query;
-    }
-    else {
-        const queryString = Object.entries(query)
-            .filter(([_, value]) => value !== undefined && value !== null)
-            .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-            .join('&');
-        config.query = queryString;
-    }
+    const queryString = Object.entries(query)
+        .filter(([_, value]) => value !== undefined && value !== null)
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+        .join('&');
+    config.query = queryString;
 };
 exports.withQuery = withQuery;
 // 组合选项

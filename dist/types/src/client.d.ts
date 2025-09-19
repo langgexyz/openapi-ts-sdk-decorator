@@ -32,17 +32,17 @@ export declare const withParams: (params: Record<string, string>) => APIOption;
  * 设置查询参数的 APIOption
  * 用于在 URL 后添加查询字符串
  *
- * @param query - 查询参数的键值对或查询字符串
+ * @param query - 查询参数的键值对
  * @returns APIOption 函数
  *
  * @example
  * withQuery({ page: '1', size: '10' })
  * // 结果：?page=1&size=10
  *
- * withQuery('page=1&size=10')
- * // 结果：?page=1&size=10
+ * withQuery({ filter: 'active', sort: 'name' })
+ * // 结果：?filter=active&sort=name
  */
-export declare const withQuery: (query: Record<string, string> | string) => APIOption;
+export declare const withQuery: (query: Record<string, string>) => APIOption;
 export declare const combineOptions: (...options: APIOption[]) => APIOption;
 /**
  * 基础 API 客户端抽象类
