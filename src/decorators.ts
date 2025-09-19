@@ -46,18 +46,26 @@ function extractPathParameters(path: string): string[] {
 }
 
 /**
- * 验证方法参数与路径参数的匹配关系
+ * 验证标准API方法签名格式
+ * 
+ * 标准格式要求：
+ * @GET('/kol/{kolId}/social')
+ * async getKOLSocialData(request: GetKOLSocialDataRequest, ...options: APIOption[]): Promise<GetKOLSocialDataResponse>
+ * 
+ * 规则：
+ * 1. 路径参数通过 withParams() 在调用时提供，不在方法签名中
+ * 2. 方法只能有两个参数：request对象 + ...options
+ * 3. request 参数必须以 "Request" 结尾
+ * 4. 返回类型必须是 Promise<SomeResponse>，Response类型以 "Response" 结尾
+ * 
  * @param path 路径字符串
  * @param method HTTP方法
  * @param target 目标对象
  * @param propertyKey 方法名
  * @param descriptor 属性描述符（可能包含方法函数）
  */
-function validateMethodParameters(path: string, method: HttpMethod, target: any, propertyKey: string, descriptor?: PropertyDescriptor): void {
-  const pathParams = extractPathParameters(path);
-  
+function validateStandardMethodSignature(path: string, method: HttpMethod, target: any, propertyKey: string, descriptor?: PropertyDescriptor): void {
   // 获取方法的参数信息
-  // 优先从 descriptor 获取，然后从 target 获取
   let methodFunction: Function | undefined;
   
   if (descriptor && descriptor.value && typeof descriptor.value === 'function') {
@@ -68,27 +76,20 @@ function validateMethodParameters(path: string, method: HttpMethod, target: any,
   }
   
   if (!methodFunction || typeof methodFunction !== 'function') {
-    // 如果是装饰器应用时，方法可能还没有定义，暂时跳过验证
-    // 这种情况下，我们需要在实际使用时进行验证
+    // 装饰器应用时方法可能还没有定义，跳过验证
     return;
   }
   
-  // 获取函数参数名（通过字符串解析）
+  // 获取函数参数信息
   const funcStr = methodFunction.toString();
   const paramMatch = funcStr.match(/\(([^)]*)\)/);
   if (!paramMatch) return;
   
   const paramStr = paramMatch[1].trim();
-  if (!paramStr && pathParams.length > 0) {
-    // 如果有路径参数但方法没有参数，这是错误的
-    throw new Error(
-      `@${method.toUpperCase()} 路径参数验证失败：路径中定义了参数 [${pathParams.join(', ')}] 但方法 ${propertyKey} 没有任何参数。` +
-      `\n  路径: "${path}"` +
-      `\n  建议: 在方法签名中添加对应的参数`
-    );
+  if (!paramStr) {
+    // 方法没有参数，这在某些情况下是允许的（如简单的GET请求）
+    return;
   }
-  
-  if (!paramStr) return;
   
   // 解析参数列表
   const params: string[] = [];
@@ -125,49 +126,108 @@ function validateMethodParameters(path: string, method: HttpMethod, target: any,
     params.push(currentParam.trim());
   }
   
-  // 过滤掉 options 参数（以 ... 开头的参数）
-  const normalParams = params.filter(param => {
-    const cleanParam = param.replace(/\s*:\s*[^,]+$/, ''); // 移除类型声明
-    return !cleanParam.startsWith('...') && !cleanParam.includes('APIOption');
+  // 分析参数类型
+  const requestParams: string[] = [];
+  const optionsParams: string[] = [];
+  const otherParams: string[] = [];
+  
+  params.forEach(param => {
+    const cleanParam = param.trim();
+    if (cleanParam.startsWith('...')) {
+      // 任何以 ... 开头的参数都被认为是 options 参数
+      optionsParams.push(cleanParam);
+    } else if (cleanParam.includes('Request') || cleanParam.split(':')[0].trim() === 'request' || cleanParam.split(':')[0].trim().startsWith('request')) {
+      // 包含 "Request" 的类型、参数名为 "request" 或以 "request" 开头的都被认为是 request 参数
+      requestParams.push(cleanParam);
+    } else {
+      otherParams.push(cleanParam);
+    }
   });
   
-  // 提取参数名（移除类型声明和可选标记）
-  const paramNames = normalParams.map(param => {
-    const name = param.split(':')[0].trim().replace(/[?]$/, '');
-    return name;
-  });
+  // 验证标准方法签名格式
+  const pathParams = extractPathParameters(path);
+  const errors: string[] = [];
+  const suggestions: string[] = [];
   
-  // 检查路径参数是否都在方法参数中
-  const missingPathParams = pathParams.filter(pathParam => !paramNames.includes(pathParam));
-  if (missingPathParams.length > 0) {
+  // 首先检查request参数数量（优先级最高）
+  if (requestParams.length > 1) {
+    errors.push(`只能有一个 request 参数，发现 ${requestParams.length} 个`);
+  } else if (requestParams.length === 1) {
+    const requestParam = requestParams[0];
+    // 如果有类型声明，检查类型是否以 "Request" 结尾
+    if (requestParam.includes(':') && !requestParam.includes('Request')) {
+      errors.push(`request 参数类型应该以 "Request" 结尾`);
+      suggestions.push(`例如: request: GetKOLSocialDataRequest`);
+    }
+    // 如果没有类型声明，只要参数名是 "request" 就可以接受
+  }
+  
+  // 检查options参数格式
+  if (optionsParams.length > 1) {
+    errors.push(`只能有一个 ...options 参数，发现 ${optionsParams.length} 个`);
+  }
+  
+  // 检查是否有路径参数在方法签名中（不符合标准）
+  if (otherParams.length > 0) {
+    // 检查是否是路径参数
+    const possiblePathParams = otherParams.filter(param => {
+      const paramName = param.split(':')[0].trim().replace(/[?]$/, '');
+      return pathParams.includes(paramName);
+    });
+    
+    if (possiblePathParams.length > 0) {
+      errors.push(`路径参数 [${possiblePathParams.map(p => p.split(':')[0].trim()).join(', ')}] 不应该在方法签名中`);
+      suggestions.push(`使用 withParams() 在调用时提供路径参数，而不是在方法签名中定义`);
+    }
+    
+    // 检查其他非标准参数
+    const nonPathParams = otherParams.filter(param => {
+      const paramName = param.split(':')[0].trim().replace(/[?]$/, '');
+      return !pathParams.includes(paramName);
+    });
+    
+    if (nonPathParams.length > 0) {
+      errors.push(`发现非标准参数 [${nonPathParams.join(', ')}]`);
+      suggestions.push(`只允许 request 对象和 ...options 参数`);
+    }
+  }
+  
+  // 如果有错误，提供完整的错误信息
+  if (errors.length > 0) {
+    const pathInfo = pathParams.length > 0 
+      ? `路径参数: {${pathParams.join('}, {')}}`
+      : `无路径参数`;
+    
+    const standardSignature = generateStandardSignature(propertyKey, pathParams, method);
+    
     throw new Error(
-      `@${method.toUpperCase()} 路径参数验证失败：路径中的参数 [${missingPathParams.join(', ')}] 在方法 ${propertyKey} 的参数列表中未找到。` +
-      `\n  路径: "${path}"` +
-      `\n  路径参数: [${pathParams.join(', ')}]` +
-      `\n  方法参数: [${paramNames.join(', ')}]` +
-      `\n  建议: 确保所有路径参数都在方法签名中定义`
+      `🚫 @${method.toUpperCase()} 方法签名格式错误\n\n` +
+      `${errors.map(error => `❌ ${error}`).join('\n')}\n\n` +
+      `📋 当前路径: "${path}"\n` +
+      `📋 ${pathInfo}\n\n` +
+      `💡 标准格式:\n${standardSignature}\n\n` +
+      `📚 说明:\n` +
+      `   • 路径参数通过 withParams() 在调用时提供\n` +
+      `   • 方法只接受 request 对象和 ...options 参数\n` +
+      `   • request 类型必须以 "Request" 结尾\n` +
+      `   • 返回类型必须是 Promise<SomeResponse>\n\n` +
+      (suggestions.length > 0 ? `🔧 建议:\n${suggestions.map(s => `   • ${s}`).join('\n')}` : '')
     );
   }
+}
+
+/**
+ * 生成标准方法签名示例
+ */
+function generateStandardSignature(methodName: string, pathParams: string[], httpMethod: HttpMethod = HttpMethod.GET): string {
+  // 生成方法名对应的Request/Response类型名
+  const capitalizedMethodName = methodName.charAt(0).toUpperCase() + methodName.slice(1);
+  const requestTypeName = `${capitalizedMethodName}Request`;
+  const responseTypeName = `${capitalizedMethodName}Response`;
   
-  // 检查多余的参数（除了路径参数之外的参数）
-  const extraParams = paramNames.filter(paramName => !pathParams.includes(paramName));
-  
-  // 简化验证：只支持路径参数和一个 Request 对象
-  // 允许的参数模式：
-  // 1. 路径参数 (从 URL 路径中提取，如 {id}, {userId})
-  // 2. 一个 Request 对象 (包含所有查询参数或请求体数据)
-  // 3. ...options (APIOption[]) - 总是允许
-  
-  // 过滤掉 options 参数（以 ...options 形式出现）
-  const nonOptionsParams = extraParams.filter(param => param !== 'options');
-  
-  // 允许最多一个非路径参数（Request 对象）
-  if (nonOptionsParams.length > 1) {
-    console.warn(
-      `⚠️  @${method.toUpperCase()} 参数提示：方法 ${propertyKey} 中有多个非路径参数 [${nonOptionsParams.join(', ')}]。` +
-      `\n  建议的参数模式: async ${propertyKey}(${pathParams.map(p => `${p}: string`).join(', ')}${pathParams.length > 0 ? ', ' : ''}request: SomeRequest, ...options: APIOption[])`
-    );
-  }
+  // 标准签名格式
+  return `    @${httpMethod.toUpperCase()}('/your/path${pathParams.map(p => `/{${p}}`).join('')}')\n` +
+         `    async ${methodName}(request: ${requestTypeName}, ...options: APIOption[]): Promise<${responseTypeName}>`;
 }
 
 /**
@@ -261,15 +321,13 @@ function createHttpMethodDecorator(method: HttpMethod) {
         descriptor = arguments[2] as PropertyDescriptor;
       }
 
-      // 验证方法参数与路径参数的匹配关系
-      // 暂时禁用参数验证，简化使用
-      // try {
-      //   // 传递 descriptor 以便获取真正的方法函数
-      //   validateMethodParameters(path, method, target, propertyKey, descriptor);
-      // } catch (error) {
-      //   // 重新抛出错误，保持错误信息完整
-      //   throw error;
-      // }
+      // 验证标准API方法签名格式
+      try {
+        validateStandardMethodSignature(path, method, target, propertyKey, descriptor);
+      } catch (error) {
+        // 重新抛出错误，保持错误信息完整
+        throw error;
+      }
 
       // 确保 target.constructor 存在
       const targetConstructor = target.constructor || target;
