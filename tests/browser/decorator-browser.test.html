@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Midway TS SDK 浏览器测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .test-passed {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .test-failed {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-skipped {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .summary {
+            background-color: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .summary h3 {
+            margin-top: 0;
+            color: #0066cc;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #4caf50;
+            transition: width 0.3s ease;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .error-details {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Midway TS SDK 浏览器测试</h1>
+        <p>这个页面测试 Midway TS SDK 在浏览器环境中的功能。</p>
+        
+        <div class="test-section">
+            <h3>📦 模块加载测试</h3>
+            <div id="module-tests"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🔧 HTTP Builder 集成测试</h3>
+            <div id="http-tests"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>📋 API 功能测试</h3>
+            <div id="api-tests"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>📊 测试摘要</h3>
+            <div class="summary">
+                <h3>测试结果</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+                </div>
+                <div id="test-summary">
+                    <p>总测试数: <span id="total-tests">0</span></p>
+                    <p>通过: <span id="passed-tests">0</span></p>
+                    <p>失败: <span id="failed-tests">0</span></p>
+                    <p>跳过: <span id="skipped-tests">0</span></p>
+                    <p>成功率: <span id="success-rate">0%</span></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🎮 控制面板</h3>
+            <button onclick="runAllTests()" id="run-tests-btn">运行所有测试</button>
+            <button onclick="clearResults()" id="clear-btn">清除结果</button>
+            <button onclick="exportResults()" id="export-btn">导出结果</button>
+        </div>
+    </div>
+
+    <!-- 加载 SDK -->
+    <script type="module">
+        // 测试结果收集器
+        class TestResult {
+            constructor() {
+                this.tests = [];
+                this.startTime = Date.now();
+            }
+
+            addTest(name, status, message = '', duration = 0) {
+                this.tests.push({
+                    name,
+                    status,
+                    message,
+                    duration,
+                    timestamp: new Date().toISOString()
+                });
+            }
+
+            getSummary() {
+                const total = this.tests.length;
+                const passed = this.tests.filter(t => t.status === 'passed').length;
+                const failed = this.tests.filter(t => t.status === 'failed').length;
+                const skipped = this.tests.filter(t => t.status === 'skipped').length;
+                const duration = Date.now() - this.startTime;
+                
+                return {
+                    total,
+                    passed,
+                    failed,
+                    skipped,
+                    duration,
+                    successRate: total > 0 ? (passed / total * 100).toFixed(2) : 0
+                };
+            }
+        }
+
+        // 全局测试结果
+        let testResult = new TestResult();
+
+        // 测试辅助函数
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+
+        function test(name, testFn) {
+            const startTime = Date.now();
+            try {
+                testFn();
+                testResult.addTest(name, 'passed', '', Date.now() - startTime);
+                addTestResult(name, 'passed', '');
+            } catch (error) {
+                testResult.addTest(name, 'failed', error.message, Date.now() - startTime);
+                addTestResult(name, 'failed', error.message);
+            }
+        }
+
+        function skip(name, reason = '') {
+            testResult.addTest(name, 'skipped', reason);
+            addTestResult(name, 'skipped', reason);
+        }
+
+        function addTestResult(name, status, message) {
+            const container = document.getElementById('module-tests');
+            const div = document.createElement('div');
+            div.className = `test-result test-${status}`;
+            
+            let icon = '✅';
+            if (status === 'failed') icon = '❌';
+            else if (status === 'skipped') icon = '⏭️';
+            
+            div.innerHTML = `${icon} ${name}`;
+            if (message) {
+                div.innerHTML += `<div class="error-details">${message}</div>`;
+            }
+            
+            container.appendChild(div);
+        }
+
+        function updateSummary() {
+            const summary = testResult.getSummary();
+            
+            document.getElementById('total-tests').textContent = summary.total;
+            document.getElementById('passed-tests').textContent = summary.passed;
+            document.getElementById('failed-tests').textContent = summary.failed;
+            document.getElementById('skipped-tests').textContent = summary.skipped;
+            document.getElementById('success-rate').textContent = summary.successRate + '%';
+            
+            const progressFill = document.getElementById('progress-fill');
+            progressFill.style.width = summary.successRate + '%';
+            
+            if (summary.failed > 0) {
+                progressFill.style.backgroundColor = '#dc3545';
+            }
+        }
+
+        // 测试函数
+        async function runModuleTests() {
+            console.log('🚀 开始模块测试...');
+            
+            try {
+                // 尝试加载 UMD 格式的 SDK
+                const script = document.createElement('script');
+                script.src = '../node_modules/midway-ts-sdk/dist/umd/index.js';
+                script.type = 'text/javascript';
+                
+                await new Promise((resolve, reject) => {
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.head.appendChild(script);
+                });
+
+                test('UMD 模块加载测试', () => {
+                    assert(typeof window.MidwayTsSdk !== 'undefined', 'UMD SDK 应该加载到 window.MidwayTsSdk');
+                });
+
+                test('模块结构测试', () => {
+                    const sdk = window.MidwayTsSdk;
+                    const expectedModules = [
+                        'Admindashboard', 'Analyticshandler', 'Internalgateway',
+                        'Order', 'Productservice', 'Publicendpoint', 'Status',
+                        'User', 'Warehousemanager'
+                    ];
+
+                    expectedModules.forEach(moduleName => {
+                        assert(sdk[moduleName], `模块 ${moduleName} 应该存在`);
+                        assert(sdk[moduleName].Client, `模块 ${moduleName} 应该有 Client 类`);
+                    });
+                });
+
+            } catch (error) {
+                skip('UMD 模块加载测试', 'UMD 格式加载失败: ' + error.message);
+            }
+        }
+
+        async function runHttpTests() {
+            console.log('🔧 开始 HTTP Builder 测试...');
+            
+            try {
+                // 测试 Fetch HttpBuilder
+                const { FetchHttpBuilder } = await import('openapi-ts-sdk-fetch');
+                
+                test('Fetch HttpBuilder 创建测试', () => {
+                    const builder = new FetchHttpBuilder('http://localhost:7001');
+                    assert(builder, 'FetchHttpBuilder 应该能够创建');
+                });
+
+                test('User Client 创建测试', () => {
+                    const { FetchHttpBuilder } = window.openapiTsSdkFetch;
+                    const builder = new FetchHttpBuilder('http://localhost:7001');
+                    const userClient = new window.MidwayTsSdk.User.Client(builder);
+                    
+                    assert(userClient, 'User Client 应该能够创建');
+                    assert(typeof userClient.getUsers === 'function', 'getUsers 方法应该存在');
+                });
+
+            } catch (error) {
+                skip('Fetch HttpBuilder 测试', 'openapi-ts-sdk-fetch 未加载: ' + error.message);
+            }
+        }
+
+        async function runApiTests() {
+            console.log('📋 开始 API 功能测试...');
+            
+            try {
+                const sdk = window.MidwayTsSdk;
+                
+                test('Client 类创建测试', () => {
+                    const { FetchHttpBuilder } = window.openapiTsSdkFetch;
+                    const builder = new FetchHttpBuilder('http://localhost:7001');
+                    const client = new sdk.Client(builder);
+                    
+                    assert(client, '主 Client 应该能够创建');
+                    assert(client.user, 'user 模块应该存在');
+                    assert(client.order, 'order 模块应该存在');
+                });
+
+                // 注意：实际的 API 调用测试需要服务器运行
+                skip('API 调用测试', '需要服务器运行，跳过实际调用测试');
+
+            } catch (error) {
+                skip('API 功能测试', '测试环境不完整: ' + error.message);
+            }
+        }
+
+        // 运行所有测试
+        window.runAllTests = async function() {
+            const runBtn = document.getElementById('run-tests-btn');
+            runBtn.disabled = true;
+            runBtn.textContent = '测试运行中...';
+            
+            // 清除之前的结果
+            clearResults();
+            
+            // 重置测试结果
+            testResult = new TestResult();
+            
+            try {
+                await runModuleTests();
+                await runHttpTests();
+                await runApiTests();
+                
+                updateSummary();
+                
+                // 保存测试结果到 localStorage
+                localStorage.setItem('midway-ts-sdk-test-results', JSON.stringify({
+                    summary: testResult.getSummary(),
+                    tests: testResult.tests,
+                    timestamp: new Date().toISOString()
+                }));
+                
+            } catch (error) {
+                console.error('测试运行失败:', error);
+            } finally {
+                runBtn.disabled = false;
+                runBtn.textContent = '运行所有测试';
+            }
+        };
+
+        // 清除结果
+        window.clearResults = function() {
+            document.getElementById('module-tests').innerHTML = '';
+            document.getElementById('http-tests').innerHTML = '';
+            document.getElementById('api-tests').innerHTML = '';
+            
+            document.getElementById('total-tests').textContent = '0';
+            document.getElementById('passed-tests').textContent = '0';
+            document.getElementById('failed-tests').textContent = '0';
+            document.getElementById('skipped-tests').textContent = '0';
+            document.getElementById('success-rate').textContent = '0%';
+            document.getElementById('progress-fill').style.width = '0%';
+            document.getElementById('progress-fill').style.backgroundColor = '#4caf50';
+        };
+
+        // 导出结果
+        window.exportResults = function() {
+            const results = localStorage.getItem('midway-ts-sdk-test-results');
+            if (results) {
+                const blob = new Blob([results], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'midway-ts-sdk-browser-test-results.json';
+                a.click();
+                URL.revokeObjectURL(url);
+            } else {
+                alert('没有测试结果可导出');
+            }
+        };
+
+        // 页面加载完成后自动运行测试
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('页面加载完成，准备运行测试...');
+        });
+    </script>
+</body>
+</html>

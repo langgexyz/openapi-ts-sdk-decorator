@@ -1,15 +1,18 @@
 # OpenAPI TypeScript SDK Decorator
 
-**装饰器和共享验证规则包** - 为 OpenAPI 生成的 TypeScript SDK 提供装饰器系统和命名约定验证。
+**TypeScript 装饰器和验证规则包** - 为 OpenAPI 生成的 TypeScript SDK 提供装饰器系统、命名约定验证和运行时类型检查。
 
-## 🎯 用途
+[![TypeScript](https://img.shields.io/badge/TypeScript-4.9%2B%20%7C%205.x-blue.svg)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-16%2B-green.svg)](https://nodejs.org/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-这个包是 OpenAPI TypeScript SDK 生态系统的核心组件，提供：
+## ✨ 特性
 
-- 🎨 **HTTP 方法装饰器** - `@GET`, `@POST`, `@PUT`, `@DELETE`, `@PATCH` 等
-- 📏 **命名规范验证** - 确保生成的代码遵循一致的命名约定
-- 🏗️ **基础客户端类** - 提供通用的请求处理和验证逻辑
-- 🔧 **共享规则** - 代码生成器和运行时验证使用相同的逻辑
+- 🎨 **现代装饰器语法** - 支持 TypeScript 4.x 和 5.x 装饰器
+- 📏 **智能命名验证** - 自动检查 API 方法和类型的命名一致性
+- 🏗️ **类型安全基类** - 提供完整的类型约束和运行时验证
+- 🔧 **代码生成集成** - CLI 工具和运行时验证使用相同的规则
+- 🌐 **跨平台支持** - Node.js 和浏览器环境都可使用
 
 ## 📦 安装
 
@@ -17,36 +20,60 @@
 npm install openapi-ts-sdk-decorator
 ```
 
-## 🚀 使用
+## 🚀 快速开始
 
-### 装饰器
+### 基本使用
 
 ```typescript
-import { APIClient, GET, POST, PUT, DELETE, PATCH } from 'openapi-ts-sdk-decorator';
+import { APIClient, RootUri, GET, POST, PUT, DELETE } from 'openapi-ts-sdk-decorator';
+import { HttpBuilder } from 'openapi-ts-sdk';
 
-export class UserClient extends APIClient {
-  @GET('/api/users/')
-  getUsers(...options: APIOption[]): Promise<GetUsersResponse> {
-    throw new Error("Auto-generated method stub. Please don't modify, it will not be executed at runtime.");
+// 1. 定义 API 客户端类
+@RootUri('api/users')
+export class UserAPI extends APIClient {
+  @GET('/')
+  getUsers(): Promise<GetUsersResponse> {
+    throw new Error("Auto-generated method stub");
   }
 
-  @POST('/api/users/')
-  createUser(request: CreateUserRequest, ...options: APIOption[]): Promise<CreateUserResponse> {
-    throw new Error("Auto-generated method stub. Please don't modify, it will not be executed at runtime.");
+  @GET('/{id}')
+  getUserById(id: string): Promise<GetUserResponse> {
+    throw new Error("Auto-generated method stub");
   }
 
-  @PUT('/api/users/{id}')
-  updateUser(id: string, request: UpdateUserRequest, ...options: APIOption[]): Promise<UpdateUserResponse> {
-    throw new Error("Auto-generated method stub. Please don't modify, it will not be executed at runtime.");
+  @POST('/')
+  createUser(request: CreateUserRequest): Promise<CreateUserResponse> {
+    throw new Error("Auto-generated method stub");
+  }
+
+  @PUT('/{id}')
+  updateUser(id: string, request: UpdateUserRequest): Promise<UpdateUserResponse> {
+    throw new Error("Auto-generated method stub");
+  }
+
+  @DELETE('/{id}')
+  deleteUser(id: string): Promise<void> {
+    throw new Error("Auto-generated method stub");
   }
 }
+
+// 2. 使用客户端
+const httpBuilder = new YourHttpBuilder('https://api.example.com');
+const userAPI = new UserAPI(httpBuilder);
+
+// 3. 调用 API（装饰器会自动处理请求）
+const users = await userAPI.getUsers();
+const user = await userAPI.getUserById('123');
 ```
 
-### 共享规则
+### 高级功能
+
+#### 1. 命名规则验证
 
 ```typescript
 import { OpenAPINamingRule } from 'openapi-ts-sdk-decorator';
 
+// 自动生成方法名
 const operation = {
   method: 'get',
   path: '/api/users/{id}',
@@ -56,105 +83,179 @@ const operation = {
 const methodName = OpenAPINamingRule.generateMethodName(operation);
 console.log(methodName); // "getUsersById"
 
+// 验证命名是否符合规范
 const validation = OpenAPINamingRule.validateMethodName('getUsersById', operation);
 console.log(validation.isValid); // true
 ```
 
-### 基础客户端
+#### 2. 装饰器选项
 
 ```typescript
-import { APIClient, APIOption, withUri, withHeaders } from 'openapi-ts-sdk-decorator';
+@RootUri('api/products')
+export class ProductAPI extends APIClient {
+  @GET('/', { 
+    summary: 'Get all products',
+    description: 'Retrieve a list of all available products' 
+  })
+  getProducts(): Promise<ProductListResponse> {
+    throw new Error("Auto-generated method stub");
+  }
 
-class MyClient extends APIClient {
-  async callApi() {
-    return this.executeRequest(
-      HttpMethod.GET,
-      '/api/users/',
-      {},
-      MyResponseType,
-      [withUri('https://api.example.com'), withHeaders({'Authorization': 'Bearer token'})]
-    );
+  @POST('/', {
+    summary: 'Create product',
+    description: 'Create a new product in the catalog'
+  })
+  createProduct(request: CreateProductRequest): Promise<CreateProductResponse> {
+    throw new Error("Auto-generated method stub");
   }
 }
 ```
 
-## 🏗️ 架构设计
 
-### 模块结构
+## 🏗️ TypeScript 兼容性
 
+### 支持的 TypeScript 版本
+
+- ✅ **TypeScript 4.9+** - 传统装饰器语法
+- ✅ **TypeScript 5.x** - 新装饰器语法 (Stage 3)
+- ✅ **自动检测** - 运行时自动适配装饰器语法
+
+### 配置示例
+
+```json
+// tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": false
+  }
+}
 ```
-openapi-ts-sdk-decorator/
-├── src/
-│   ├── rules.ts             # 命名规则和验证逻辑
-│   ├── decorators.ts        # HTTP 方法装饰器
-│   └── client.ts            # 基础客户端类
-├── index.ts                 # 主导出文件
-└── package.json
-```
 
-### 依赖关系
+## 📚 API 参考
 
-```
-openapi-ts-sdk-cli ──→ openapi-ts-sdk-decorator ──→ openapi-ts-sdk
-                   ↓                           ↓
-            Generated SDKs ────────────────────┘
-```
+### 装饰器
 
-## 🔧 特性
+| 装饰器 | 用途 | 示例 |
+|--------|------|------|
+| `@RootUri(path)` | 定义 API 根路径 | `@RootUri('api/users')` |
+| `@GET(path, options?)` | GET 请求 | `@GET('/{id}')` |
+| `@POST(path, options?)` | POST 请求 | `@POST('/', {summary: 'Create'})` |
+| `@PUT(path, options?)` | PUT 请求 | `@PUT('/{id}')` |
+| `@DELETE(path, options?)` | DELETE 请求 | `@DELETE('/{id}')` |
+| `@PATCH(path, options?)` | PATCH 请求 | `@PATCH('/{id}')` |
 
-### 1. 统一的命名规范
+### 工具函数
 
-- ✅ **方法名**: `getUsers`, `createUser`, `updateUsersById`
-- ✅ **类型名**: `GetUsersRequest/Response`, `CreateUserRequest/Response`
-- ✅ **参数顺序**: 与 URL 路径中的出现顺序一致
+| 函数 | 用途 | 返回值 |
+|------|------|--------|
+| `getAPIMethodsMetadata(target)` | 获取 API 方法元数据 | `APIMethodMetadata[]` |
+| `getRootUri(clientClass)` | 获取根路径 | `string \| null` |
+| `getAllRootUriMappings()` | 获取全局映射 | `Map<string, string>` |
 
-### 2. 运行时验证
+### 命名规则
 
-- 🔍 **Request/Response 类型命名检查**
-- 📝 **Class-validator 集成**
-- ⚠️ **详细的错误信息和修复建议**
+| 规则 | 说明 | 示例 |
+|------|------|------|
+| **方法名** | HTTP 方法 + 资源名 + 参数 | `getUsersById`, `createUser` |
+| **类型名** | 方法名 + Request/Response | `GetUsersRequest`, `CreateUserResponse` |
+| **参数顺序** | 与 URL 路径中出现顺序一致 | `updateUser(id, data)` 对应 `/users/{id}` |
 
-### 3. 装饰器系统
+## ⚡ 性能和最佳实践
 
-- 🎨 **简洁的 API 定义语法**
-- 📊 **元数据保存**
-- 🔧 **可扩展的选项配置**
-
-## 🧪 验证规则
-
-### 方法名验证
+### 错误处理
 
 ```typescript
-// ✅ 正确
-getUsersById    // GET /api/users/{id}
-createUser      // POST /api/users/
-updateUsersById // PUT /api/users/{id}
+import { OpenAPINamingRule } from 'openapi-ts-sdk-decorator';
 
-// ❌ 错误
-fetchUsers      // 应该是 getUsers
-addUser         // 应该是 createUser
-modifyUser      // 应该是 updateUser
+try {
+  // 装饰器会自动验证命名规范
+  const userAPI = new UserAPI(httpBuilder);
+  const result = await userAPI.getUsers();
+} catch (error) {
+  if (error.message.includes('naming convention')) {
+    console.error('命名规范违规:', error.message);
+    // 错误信息包含具体的修复建议
+  }
+}
 ```
 
-### 类型名验证
+### 开发时验证
 
 ```typescript
-// ✅ 正确的配对
-GetUsersRequest  + GetUsersResponse
-CreateUserRequest + CreateUserResponse
+// 在开发阶段验证 API 定义是否符合规范
+import { validateAPI } from 'openapi-ts-sdk-decorator';
 
-// ❌ 错误的配对
-GetUsersRequest + CreateUserResponse  // 前缀不一致
-UserInfo + UserData                   // 缺少 Request/Response 后缀
+const validationResult = validateAPI(UserAPI);
+if (!validationResult.isValid) {
+  console.warn('API 定义问题:', validationResult.errors);
+}
 ```
 
-## 📚 相关包
+### 代码生成集成
 
-- [`openapi-ts-sdk`](../openapi-ts-sdk/) - 核心 HTTP 构建器和接口
-- [`openapi-ts-sdk-cli`](../openapi-ts-sdk-cli/) - 代码生成器
-- [`openapi-ts-sdk-axios`](../openapi-ts-sdk-axios/) - Axios 实现
-- [`openapi-ts-sdk-fetch`](../openapi-ts-sdk-fetch/) - Fetch API 实现
+这个包主要配合 `openapi-ts-sdk-cli` 使用：
+
+```bash
+# 使用 CLI 生成 SDK
+npx openapi-ts-sdk-cli generate \
+  --input http://localhost:7001/swagger-ui/index.json \
+  --output ./src/api
+
+# 生成的代码自动包含装饰器和验证
+```
+
+## 🔗 生态系统
+
+| 包名 | 用途 | GitHub |
+|------|------|--------|
+| `openapi-ts-sdk` | 核心 HTTP 接口 | [openapi-ts-sdk](https://github.com/langgexyz/openapi-ts-sdk) |
+| `openapi-ts-sdk-cli` | 代码生成器 | [openapi-ts-sdk-cli](https://github.com/langgexyz/openapi-ts-sdk-cli) |
+| `openapi-ts-sdk-axios` | Axios 实现 | [openapi-ts-sdk-axios](https://github.com/langgexyz/openapi-ts-sdk-axios) |
+| `openapi-ts-sdk-fetch` | Fetch API 实现 | [openapi-ts-sdk-fetch](https://github.com/langgexyz/openapi-ts-sdk-fetch) |
+
+## 🧪 测试
+
+本包提供完整的单元测试覆盖：
+
+```bash
+# 运行所有测试
+npm test
+
+# 运行特定测试
+npm run test:compatibility    # TypeScript 5.x 兼容性
+npm run test:naming          # 命名规则验证  
+npm run test:decorator-basics # 装饰器基础功能
+npm run test:function-naming # 函数命名验证
+
+# 浏览器环境测试
+npm run test:browser
+```
+
+### 测试覆盖范围
+
+- ✅ TypeScript 4.x/5.x 兼容性
+- ✅ 装饰器元数据系统
+- ✅ 命名规则一致性验证
+- ✅ HTTP 方法装饰器功能
+- ✅ 类装饰器 (@RootUri)
+- ✅ 错误处理和验证
+- ✅ 浏览器环境兼容性
+
+> **注意**: 集成测试（需要外部依赖）位于独立的测试项目中。
+
+## 🚀 版本历史
+
+- **v1.0.2** - TypeScript 5.x 兼容性支持
+- **v1.0.1** - 增加 @RootUri 装饰器和服务器接口推导
+- **v1.0.0** - 首个稳定版本
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
 
 ## 📄 许可证
 
-MIT License
+MIT License - 详见 [LICENSE](LICENSE) 文件

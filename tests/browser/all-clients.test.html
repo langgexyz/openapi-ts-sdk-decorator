@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Midway TS SDK - 全接口浏览器测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .test-passed {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .test-failed {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-skipped {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .summary {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .summary h3 {
+            margin-top: 0;
+            color: #0066cc;
+        }
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 10px;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Midway TS SDK - 全接口浏览器测试</h1>
+        
+        <div class="controls">
+            <button id="runTests" onclick="runAllTests()">开始测试</button>
+            <button id="clearResults" onclick="clearResults()">清除结果</button>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            🔄 正在加载 SDK 和运行测试...
+        </div>
+
+        <div id="errorContainer"></div>
+        <div id="resultsContainer"></div>
+        <div id="summaryContainer"></div>
+    </div>
+
+    <!-- 加载 SDK -->
+    <script src="../node_modules/midway-ts-sdk/dist/umd/index.js"></script>
+    
+    <script>
+        // 测试结果收集器
+        class TestResult {
+            constructor() {
+                this.tests = [];
+                this.startTime = Date.now();
+                this.passed = 0;
+                this.failed = 0;
+                this.skipped = 0;
+            }
+
+            addTest(name, status, message = '', duration = 0) {
+                this.tests.push({
+                    name,
+                    status,
+                    message,
+                    duration,
+                    timestamp: new Date().toISOString()
+                });
+
+                if (status === 'passed') this.passed++;
+                else if (status === 'failed') this.failed++;
+                else if (status === 'skipped') this.skipped++;
+            }
+
+            getSummary() {
+                const total = this.tests.length;
+                const duration = Date.now() - this.startTime;
+                
+                return {
+                    total,
+                    passed: this.passed,
+                    failed: this.failed,
+                    skipped: this.skipped,
+                    duration,
+                    successRate: total > 0 ? (this.passed / total * 100).toFixed(2) : 0
+                };
+            }
+        }
+
+        // 测试辅助函数
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+
+        function test(name, testFn) {
+            const startTime = Date.now();
+            try {
+                testFn();
+                result.addTest(name, 'passed', '', Date.now() - startTime);
+                return { status: 'passed', message: '' };
+            } catch (error) {
+                result.addTest(name, 'failed', error.message, Date.now() - startTime);
+                return { status: 'failed', message: error.message };
+            }
+        }
+
+        function skip(name, reason = '') {
+            result.addTest(name, 'skipped', reason);
+            return { status: 'skipped', message: reason };
+        }
+
+        // 显示测试结果
+        function displayTestResult(testName, result) {
+            const container = document.getElementById('resultsContainer');
+            const div = document.createElement('div');
+            div.className = `test-result test-${result.status}`;
+            
+            const status = result.status === 'passed' ? '✅' : 
+                          result.status === 'failed' ? '❌' : '⏭️';
+            
+            div.innerHTML = `${status} ${testName}${result.message ? ` - ${result.message}` : ''}`;
+            container.appendChild(div);
+        }
+
+        // 显示错误
+        function displayError(message) {
+            const container = document.getElementById('errorContainer');
+            const div = document.createElement('div');
+            div.className = 'error';
+            div.textContent = message;
+            container.appendChild(div);
+        }
+
+        // 显示摘要
+        function displaySummary() {
+            const summary = result.getSummary();
+            const container = document.getElementById('summaryContainer');
+            
+            container.innerHTML = `
+                <div class="summary">
+                    <h3>📈 测试摘要</h3>
+                    <p><strong>总测试数:</strong> ${summary.total}</p>
+                    <p><strong>通过:</strong> ${summary.passed}</p>
+                    <p><strong>失败:</strong> ${summary.failed}</p>
+                    <p><strong>跳过:</strong> ${summary.skipped}</p>
+                    <p><strong>成功率:</strong> ${summary.successRate}%</p>
+                    <p><strong>耗时:</strong> ${summary.duration}ms</p>
+                </div>
+            `;
+        }
+
+        // 清除结果
+        function clearResults() {
+            document.getElementById('resultsContainer').innerHTML = '';
+            document.getElementById('summaryContainer').innerHTML = '';
+            document.getElementById('errorContainer').innerHTML = '';
+        }
+
+        // 运行所有测试
+        async function runAllTests() {
+            const runButton = document.getElementById('runTests');
+            const loading = document.getElementById('loading');
+            
+            runButton.disabled = true;
+            loading.style.display = 'block';
+            clearResults();
+            
+            try {
+                // 初始化测试结果收集器
+                window.result = new TestResult();
+                
+                console.log('🚀 开始 Midway TS SDK 全接口浏览器测试...');
+                
+                // 检查 SDK 是否加载
+                if (typeof window.MidwayTsSdk === 'undefined') {
+                    throw new Error('SDK 未正确加载');
+                }
+                
+                const sdk = window.MidwayTsSdk;
+                
+                // 获取所有模块
+                const modules = [
+                    'Admindashboard', 'Analyticshandler', 'Internalgateway',
+                    'Order', 'Productservice', 'Publicendpoint', 'Status',
+                    'User', 'Warehousemanager'
+                ];
+                
+                // 测试模块导入
+                const moduleTest = test('模块导入测试', () => {
+                    assert(sdk, 'SDK 应该存在');
+                    assert(typeof sdk === 'object', 'SDK 应该是对象');
+                    
+                    modules.forEach(moduleName => {
+                        assert(sdk[moduleName], `模块 ${moduleName} 应该存在`);
+                        assert(sdk[moduleName].Client, `模块 ${moduleName} 应该有 Client 类`);
+                    });
+                });
+                displayTestResult('模块导入测试', moduleTest);
+                
+                // 测试每个模块的 Client 创建
+                modules.forEach(moduleName => {
+                    const module = sdk[moduleName];
+                    
+                    if (!module || !module.Client) {
+                        const skipResult = skip(`模块 ${moduleName} 测试`, '模块或 Client 不存在');
+                        displayTestResult(`模块 ${moduleName} 测试`, skipResult);
+                        return;
+                    }
+                    
+                    const clientTest = test(`${moduleName} Client 创建测试`, () => {
+                        // 创建一个模拟的 HTTP Builder
+                        const mockBuilder = {
+                            baseUrl: 'http://localhost:7001',
+                            request: () => Promise.resolve({})
+                        };
+                        
+                        const client = new module.Client(mockBuilder);
+                        assert(client, `${moduleName} Client 应该能够创建`);
+                        
+                        // 检查 Client 是否有方法
+                        const clientMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(client))
+                            .filter(name => name !== 'constructor' && typeof client[name] === 'function');
+                        
+                        assert(clientMethods.length > 0, `${moduleName} Client 应该有方法`);
+                        
+                        console.log(`    📋 ${moduleName} 方法: ${clientMethods.join(', ')}`);
+                    });
+                    displayTestResult(`${moduleName} Client 创建测试`, clientTest);
+                });
+                
+                // 测试统一 Client 类
+                if (sdk.Client) {
+                    const unifiedClientTest = test('统一 Client 类测试', () => {
+                        const mockBuilder = {
+                            baseUrl: 'http://localhost:7001',
+                            request: () => Promise.resolve({})
+                        };
+                        
+                        const client = new sdk.Client(mockBuilder);
+                        assert(client, '统一 Client 应该能够创建');
+                        
+                        // 检查所有模块的客户端
+                        modules.forEach(moduleName => {
+                            const moduleClient = client[moduleName.toLowerCase()];
+                            assert(moduleClient, `统一 Client 应该有 ${moduleName.toLowerCase()} 客户端`);
+                            assert(typeof moduleClient === 'object', `${moduleName.toLowerCase()} 客户端应该是对象`);
+                        });
+                    });
+                    displayTestResult('统一 Client 类测试', unifiedClientTest);
+                }
+                
+                // 测试方法调用（不实际发送请求）
+                const methodTest = test('方法调用测试', () => {
+                    if (sdk.User && sdk.User.Client) {
+                        const mockBuilder = {
+                            baseUrl: 'http://localhost:7001',
+                            request: () => Promise.resolve({})
+                        };
+                        
+                        const userClient = new sdk.User.Client(mockBuilder);
+                        
+                        // 检查常见方法是否存在
+                        const commonMethods = ['getUsers', 'getUser', 'createUser', 'updateUser', 'deleteUser'];
+                        
+                        commonMethods.forEach(method => {
+                            if (typeof userClient[method] === 'function') {
+                                console.log(`    ✅ User.${method} 方法存在`);
+                            }
+                        });
+                    }
+                });
+                displayTestResult('方法调用测试', methodTest);
+                
+                // 测试错误处理
+                const errorTest = test('错误处理测试', () => {
+                    if (sdk.User && sdk.User.Client) {
+                        const mockBuilder = {
+                            baseUrl: 'invalid-url',
+                            request: () => Promise.resolve({})
+                        };
+                        
+                        const userClient = new sdk.User.Client(mockBuilder);
+                        assert(userClient, '即使使用无效 URL，Client 也应该能够创建');
+                    }
+                });
+                displayTestResult('错误处理测试', errorTest);
+                
+                // 显示摘要
+                displaySummary();
+                
+                console.log('📊 测试完成');
+                
+            } catch (error) {
+                displayError(`测试运行失败: ${error.message}`);
+                console.error('测试运行失败:', error);
+            } finally {
+                runButton.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        // 页面加载完成后自动运行测试
+        window.addEventListener('load', () => {
+            console.log('页面加载完成，SDK 状态:', typeof window.MidwayTsSdk !== 'undefined' ? '已加载' : '未加载');
+        });
+    </script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 {
   "name": "openapi-ts-sdk-decorator",
-  "version": "1.0.1",
-  "description": "OpenAPI TypeScript SDK decorators and shared validation rules - provides decorator system and naming conventions for generated SDKs",
+  "version": "1.0.2",
+  "description": "OpenAPI TypeScript SDK decorators with TypeScript 5.x compatibility - provides decorator system and naming conventions for generated SDKs",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/types/index.d.ts",
@@ -20,8 +20,11 @@
   "keywords": [
     "openapi",
     "typescript",
+    "typescript-5",
+    "decorators",
+    "stage3-decorators",
+    "legacy-decorators",
     "sdk",
-    "decorator",
     "validation",
     "generator",
     "http",
@@ -46,7 +49,15 @@
     "build:types": "tsc -p tsconfig.types.json",
     "clean": "rm -rf dist",
     "watch": "tsc --watch",
-    "test": "echo \"No tests specified\" && exit 0"
+    "test": "node tests/index.js",
+    "test:node": "node tests/index.js node",
+    "test:browser": "echo '🌐 请在浏览器中打开: tests/browser/index.html' && open tests/browser/index.html 2>/dev/null || echo '手动打开: tests/browser/index.html'",
+    "test:compatibility": "node tests/node/compatibility.test.js",
+    "test:naming": "node tests/node/naming-rules.test.js",
+    "test:function-naming": "node tests/node/function-naming.test.js",
+    "test:decorator-basics": "node tests/node/decorator-basics.test.js",
+    "test:rooturi": "node tests/node/rooturi-normalization.test.js",
+    "test:http-methods": "node tests/node/http-methods-validation.test.js"
   },
   "dependencies": {
     "class-transformer": "^0.5.1",
@@ -54,8 +65,14 @@
     "openapi-ts-sdk": "https://github.com/langgexyz/openapi-ts-sdk.git#semver:^1.0.0",
     "reflect-metadata": "^0.1.13"
   },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "peerDependencies": {
+    "typescript": ">=4.9.0 <6.0.0"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.3.0"
   }
 }

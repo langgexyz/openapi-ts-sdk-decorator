@@ -14,6 +14,17 @@ exports.OpenAPINamingRule = exports.OpenAPINamingRuleImpl = void 0;
  * TypeScript SDK generation and validation.
  */
 class OpenAPINamingRuleImpl {
+    // HTTP method -> method prefix mapping
+    static { this.HTTP_METHOD_PREFIXES = {
+        'get': 'get',
+        'post': 'create',
+        'put': 'update',
+        'delete': 'delete',
+        'patch': 'patch'
+    }; }
+    // Path segments to filter out
+    static { this.FILTERED_SEGMENTS = ['api']; }
+    static { this.VERSION_PATTERN = /^v\d+$/i; }
     generateMethodName(operation) {
         const methodPrefix = this.getMethodPrefix(operation.method);
         const resourceName = this.extractResourceName(operation.path);
@@ -146,17 +157,6 @@ class OpenAPINamingRuleImpl {
     }
 }
 exports.OpenAPINamingRuleImpl = OpenAPINamingRuleImpl;
-// HTTP method -> method prefix mapping
-OpenAPINamingRuleImpl.HTTP_METHOD_PREFIXES = {
-    'get': 'get',
-    'post': 'create',
-    'put': 'update',
-    'delete': 'delete',
-    'patch': 'patch'
-};
-// Path segments to filter out
-OpenAPINamingRuleImpl.FILTERED_SEGMENTS = ['api'];
-OpenAPINamingRuleImpl.VERSION_PATTERN = /^v\d+$/i;
 // Export default instance for use in code generation and runtime validation
 exports.OpenAPINamingRule = new OpenAPINamingRuleImpl();
 //# sourceMappingURL=rules.js.map
