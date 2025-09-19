@@ -1,6 +1,6 @@
 {
   "name": "openapi-ts-sdk-decorator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "OpenAPI TypeScript SDK decorators and shared validation rules - provides decorator system and naming conventions for generated SDKs",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
