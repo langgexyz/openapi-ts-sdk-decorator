@@ -1,5 +1,6 @@
-/** @type {import('jest').Config} */
-module.exports = {
+import type { Config } from 'jest';
+
+const config: Config = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/tests'],
@@ -9,7 +10,15 @@ module.exports = {
     '**/tests/**/*.spec.ts'
   ],
   transform: {
-    '^.+\\.ts$': 'ts-jest',
+    '^.+\\.ts$': ['ts-jest', {
+      tsconfig: {
+        experimentalDecorators: true,
+        emitDecoratorMetadata: true,
+        strict: true,
+        target: 'ES2020',
+        module: 'CommonJS'
+      }
+    }]
   },
   collectCoverageFrom: [
     'src/**/*.ts',
@@ -21,18 +30,7 @@ module.exports = {
   coverageReporters: ['text', 'lcov', 'html'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   moduleFileExtensions: ['ts', 'js', 'json'],
-  testTimeout: 10000,
-  
-  // TypeScript specific configuration
-  transform: {
-    '^.+\\.ts$': ['ts-jest', {
-      tsconfig: {
-        experimentalDecorators: true,
-        emitDecoratorMetadata: true,
-        strict: true,
-        target: 'ES2020',
-        module: 'CommonJS'
-      }
-    }]
-  }
+  testTimeout: 10000
 };
+
+export default config;
