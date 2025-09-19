@@ -1,13 +1,25 @@
 /**
- * OpenAPI TypeScript SDK Decorators
+ * OpenAPI TypeScript SDK Decorators - 新设计
  * 
- * TypeScript 5.x 兼容版本 - 同时支持新旧装饰器语法
- * 1. TypeScript 5.x 新装饰器语法（Stage 3）
- * 2. TypeScript 4.x 旧装饰器语法（Legacy/Experimental）
+ * 基于参数装饰器的智能设计：
+ * • 使用装饰器元数据而非复杂的字符串解析
+ * • 在简单场景使用正则（如路径参数提取）提高效率
+ * • 避免在复杂解析场景使用脆弱的正则
+ * 
+ * @GET('/users/{id}')
+ * async getUser<Request = GetUserRequest, Response = GetUserResponse>(
+ *   @Param('id') id: string,
+ *   @Request() request: Request,
+ *   @ResponseType() responseType: { new (...args: any[]): Response },
+ *   @Options() ...options: APIOption[]
+ * ): Promise<Response> {}
  */
 
 import { HttpMethod } from 'openapi-ts-sdk';
+import { plainToClass } from 'class-transformer';
+import { validate } from 'class-validator';
 import { isValidationEnabled } from './config';
+import { APIOption, withParams, withQuery } from './client';
 
 /**
  * 装饰器命名空间常量
@@ -15,16 +27,21 @@ import { isValidationEnabled } from './config';
 const DECORATOR_NAMESPACE = '__openapi_ts_sdk_decorator_';
 const API_METHODS_KEY = `${DECORATOR_NAMESPACE}apiMethods`;
 const ROOT_URI_KEY = `${DECORATOR_NAMESPACE}rootUri`;
-const GLOBAL_ROOT_URIS_KEY = `${DECORATOR_NAMESPACE}rootUris`;
+const PARAM_METADATA_KEY = `${DECORATOR_NAMESPACE}paramMetadata`;
 
 /**
- * API 装饰器选项接口
+ * 参数元数据接口
  */
-export interface DecoratorOptions {
-  summary?: string;
-  description?: string;
-  [key: string]: any;
+export interface ParameterMetadata {
+  type: 'param' | 'request' | 'responseType' | 'options' | 'query';
+  paramName?: string;
+  index: number;
 }
+
+/**
+ * 参数元数据映射
+ */
+export type ParameterMetadataMap = Record<number, ParameterMetadata>;
 
 /**
  * API 方法元数据接口
@@ -33,349 +50,309 @@ export interface APIMethodMetadata {
   name: string;
   method: HttpMethod;
   path: string;
-  options?: DecoratorOptions;
+  options?: any;
 }
 
 /**
- * 提取路径中的参数
- * @param path 路径字符串
- * @returns 路径参数数组
+ * 装饰器选项接口
  */
-function extractPathParameters(path: string): string[] {
-  const matches = path.match(/\{([^}]+)\}/g) || [];
-  return matches.map(match => match.slice(1, -1));
+export interface DecoratorOptions {
+  summary?: string;
+  description?: string;
+  [key: string]: any;
+}
+
+// =======================
+// 参数装饰器
+// =======================
+
+/**
+ * 路径参数装饰器
+ * @param paramName 路径参数名
+ */
+export function Param(paramName: string) {
+  return function(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+    if (!propertyKey) return;
+    const existingMetadata: ParameterMetadataMap = Reflect.getMetadata(PARAM_METADATA_KEY, target, propertyKey) || {};
+    
+    existingMetadata[parameterIndex] = {
+      type: 'param',
+      paramName,
+      index: parameterIndex
+    };
+    
+    Reflect.defineMetadata(PARAM_METADATA_KEY, existingMetadata, target, propertyKey);
+  };
 }
 
 /**
- * 验证标准API方法签名格式
- * 
- * 标准格式要求：
- * @GET('/kol/{kolId}/social')
- * async getKOLSocialData(request: GetKOLSocialDataRequest, ...options: APIOption[]): Promise<GetKOLSocialDataResponse>
- * 
- * 规则：
- * 1. 路径参数通过 withParams() 在调用时提供，不在方法签名中
- * 2. 方法只能有两个参数：request对象 + ...options
- * 3. request 参数必须以 "Request" 结尾
- * 4. 返回类型必须是 Promise<SomeResponse>，Response类型以 "Response" 结尾
- * 
- * @param path 路径字符串
- * @param method HTTP方法
- * @param target 目标对象
- * @param propertyKey 方法名
- * @param descriptor 属性描述符（可能包含方法函数）
+ * 请求体装饰器
  */
-function validateStandardMethodSignature(path: string, method: HttpMethod, target: any, propertyKey: string, descriptor?: PropertyDescriptor): void {
-  // 🚀 检查开关：如果禁用验证，直接返回
+export function Request() {
+  return function(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+    if (!propertyKey) return;
+    const existingMetadata: ParameterMetadataMap = Reflect.getMetadata(PARAM_METADATA_KEY, target, propertyKey) || {};
+    
+    existingMetadata[parameterIndex] = {
+      type: 'request',
+      index: parameterIndex
+    };
+    
+    Reflect.defineMetadata(PARAM_METADATA_KEY, existingMetadata, target, propertyKey);
+  };
+}
+
+/**
+ * 响应类型装饰器
+ */
+export function ResponseType() {
+  return function(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+    if (!propertyKey) return;
+    const existingMetadata: ParameterMetadataMap = Reflect.getMetadata(PARAM_METADATA_KEY, target, propertyKey) || {};
+    
+    existingMetadata[parameterIndex] = {
+      type: 'responseType',
+      index: parameterIndex
+    };
+    
+    Reflect.defineMetadata(PARAM_METADATA_KEY, existingMetadata, target, propertyKey);
+  };
+}
+
+/**
+ * 查询参数装饰器
+ */
+export function Query() {
+  return function(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+    if (!propertyKey) return;
+    const existingMetadata: ParameterMetadataMap = Reflect.getMetadata(PARAM_METADATA_KEY, target, propertyKey) || {};
+    
+    existingMetadata[parameterIndex] = {
+      type: 'query',
+      index: parameterIndex
+    };
+    
+    Reflect.defineMetadata(PARAM_METADATA_KEY, existingMetadata, target, propertyKey);
+  };
+}
+
+/**
+ * 选项参数装饰器
+ */
+export function Options() {
+  return function(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+    if (!propertyKey) return;
+    const existingMetadata: ParameterMetadataMap = Reflect.getMetadata(PARAM_METADATA_KEY, target, propertyKey) || {};
+    
+    existingMetadata[parameterIndex] = {
+      type: 'options',
+      index: parameterIndex
+    };
+    
+    Reflect.defineMetadata(PARAM_METADATA_KEY, existingMetadata, target, propertyKey);
+  };
+}
+
+// =======================
+// 工具函数 - 无正则匹配
+// =======================
+
+
+/**
+ * 简单的路径验证 - 无正则匹配
+ */
+function validatePath(path: string, decoratorName: string): void {
   if (!isValidationEnabled()) {
     return;
   }
   
-  // 获取方法的参数信息
-  let methodFunction: Function | undefined;
-  
-  if (descriptor && descriptor.value && typeof descriptor.value === 'function') {
-    methodFunction = descriptor.value;
-  } else {
-    methodFunction = target[propertyKey] || 
-                    (target.constructor && target.constructor.prototype && target.constructor.prototype[propertyKey]);
+  if (!path || path.length === 0) {
+    throw new Error(`@${decoratorName} 路径不能为空`);
   }
   
-  if (!methodFunction || typeof methodFunction !== 'function') {
-    // 装饰器应用时方法可能还没有定义，跳过验证
+  if (path[0] !== '/') {
+    throw new Error(`@${decoratorName} 路径必须以 '/' 开头，当前值: "${path}"`);
+  }
+}
+
+/**
+ * 验证参数装饰器配置 - 完全基于装饰器元数据
+ */
+function validateParameterDecorators(path: string, method: HttpMethod, target: any, propertyKey: string): void {
+  if (!isValidationEnabled()) {
     return;
   }
+
+  const paramMetadata: ParameterMetadataMap = Reflect.getMetadata(PARAM_METADATA_KEY, target, propertyKey) || {};
   
-  // 获取函数参数信息
-  const funcStr = methodFunction.toString();
-  const paramMatch = funcStr.match(/\(([^)]*)\)/);
-  if (!paramMatch) return;
+  // 统计各类型参数
+  const paramCounts = {
+    param: 0,
+    request: 0,
+    responseType: 0,
+    query: 0,
+    options: 0
+  };
   
-  const paramStr = paramMatch[1].trim();
-  if (!paramStr) {
-    // 方法没有参数，这在某些情况下是允许的（如简单的GET请求）
-    return;
-  }
-  
-  // 解析参数列表
-  const params: string[] = [];
-  let currentParam = '';
-  let bracketCount = 0;
-  let inString = false;
-  let stringChar = '';
-  
-  for (let i = 0; i < paramStr.length; i++) {
-    const char = paramStr[i];
-    
-    if (!inString && (char === '"' || char === "'")) {
-      inString = true;
-      stringChar = char;
-      currentParam += char;
-    } else if (inString && char === stringChar) {
-      inString = false;
-      currentParam += char;
-    } else if (!inString && char === '{') {
-      bracketCount++;
-      currentParam += char;
-    } else if (!inString && char === '}') {
-      bracketCount--;
-      currentParam += char;
-    } else if (!inString && char === ',' && bracketCount === 0) {
-      params.push(currentParam.trim());
-      currentParam = '';
-    } else {
-      currentParam += char;
-    }
-  }
-  
-  if (currentParam.trim()) {
-    params.push(currentParam.trim());
-  }
-  
-  // 验证标准方法签名格式
-  const pathParams = extractPathParameters(path);
-  
-  // 分析参数类型（基于运行时可获得的信息）
-  const requestParams: string[] = [];
-  const optionsParams: string[] = [];
-  const pathParamsInSignature: string[] = [];
-  
-  params.forEach(param => {
-    const cleanParam = param.trim();
-    const paramName = cleanParam.split(':')[0].trim();
-    
-    if (cleanParam.startsWith('...')) {
-      // 任何以 ... 开头的参数都被认为是 options 参数
-      optionsParams.push(cleanParam);
-    } else if (pathParams.includes(paramName)) {
-      // 检查路径参数是否错误地出现在方法签名中
-      pathParamsInSignature.push(cleanParam);
-    } else {
-      // 非路径参数、非options参数 = 可能的 request 参数
-      requestParams.push(cleanParam);
-    }
+  // 分析参数装饰器元数据
+  Object.values(paramMetadata).forEach(meta => {
+    paramCounts[meta.type]++;
   });
+  
   const errors: string[] = [];
-  const suggestions: string[] = [];
   
-  // 生成方法名对应的类型名（用于错误信息）
-  const capitalizedMethodName = propertyKey.charAt(0).toUpperCase() + propertyKey.slice(1);
-  
-  // 1. 检查路径参数是否错误地出现在方法签名中
-  if (pathParamsInSignature.length > 0) {
-    errors.push(`路径参数 [${pathParamsInSignature.map(p => p.split(':')[0].trim()).join(', ')}] 不应该在方法签名中`);
-    suggestions.push(`使用 withParams() 在调用时提供路径参数，而不是在方法签名中定义`);
+  // 简单验证规则
+  if (paramCounts.request > 1) {
+    errors.push(`只能有一个 @Request() 参数`);
   }
   
-  // 2. 检查 request 参数数量
-  if (requestParams.length > 1) {
-    errors.push(`只能有一个 request 参数，发现 ${requestParams.length} 个`);
-    suggestions.push(`合并为单个 request 对象: request: ${capitalizedMethodName}Request`);
+  if (paramCounts.responseType > 1) {
+    errors.push(`只能有一个 @ResponseType() 参数`);
   }
   
-  // 3. 检查 options 参数格式  
-  if (optionsParams.length > 1) {
-    errors.push(`只能有一个 ...options 参数，发现 ${optionsParams.length} 个`);
-    suggestions.push(`使用单个 rest 参数: ...options: APIOption[]`);
+  if (paramCounts.query > 1) {
+    errors.push(`只能有一个 @Query() 参数`);
   }
   
-  // 4. 验证整体参数结构（运行时可检查的部分）
-  const totalNonOptionsParams = requestParams.length + pathParamsInSignature.length;
-  
-  // 检查参数总数是否合理
-  if (totalNonOptionsParams > 1) {
-    errors.push(`方法签名应该只有 request 参数和 ...options 参数`);
-    suggestions.push(`标准格式: async ${propertyKey}(request: ${capitalizedMethodName}Request, ...options: APIOption[])`);
+  if (paramCounts.options > 1) {
+    errors.push(`只能有一个 @Options() 参数`);
   }
   
-  // 5. 对于有 request 参数的情况，建议使用标准命名
-  if (requestParams.length === 1) {
-    const requestParam = requestParams[0];
-    const paramName = requestParam.split(':')[0].trim();
-    
-    // 建议使用 "request" 作为参数名（但不强制要求）
-    if (paramName !== 'request') {
-      suggestions.push(`建议使用标准参数名: request: ${capitalizedMethodName}Request（当前: ${paramName}）`);
-    }
-  }
+  // 注意：不再验证路径参数与路径的对应关系
+  // 因为 @Param('paramName') 已经明确声明了参数名
+  // 如果声明错误，会在运行时自然发现（404或路径错误）
   
-  // 如果有错误，提供完整的错误信息
   if (errors.length > 0) {
-    const pathInfo = pathParams.length > 0 
-      ? `路径参数: {${pathParams.join('}, {')}}`
-      : `无路径参数`;
-    
-    const standardSignature = generateStandardSignature(propertyKey, pathParams, method, path);
-    
-    // 生成实际的Response类型名
-    const responseTypeName = `${capitalizedMethodName}Response`;
-    
-    throw new Error(
-      `🚫 @${method.toUpperCase()} 方法签名格式错误\n\n` +
-      `${errors.map(error => `❌ ${error}`).join('\n')}\n\n` +
-      `📋 当前路径: "${path}"\n` +
-      `📋 ${pathInfo}\n\n` +
-      `💡 标准格式:\n${standardSignature}\n\n` +
-      `📚 说明:\n` +
-      `   • 路径参数通过 withParams() 在调用时提供\n` +
-      `   • 方法只接受 request 对象和 ...options 参数\n` +
-      `   • 建议格式：request: ${capitalizedMethodName}Request\n` +
-      `   • 返回类型：Promise<${responseTypeName}>\n` +
-      `   • 注意：类型检查在 TypeScript 编译时进行\n\n` +
-      (suggestions.length > 0 ? `🔧 建议:\n${suggestions.map(s => `   • ${s}`).join('\n')}` : '')
-    );
+    throw new Error(`🚫 @${method.toUpperCase()} 配置错误: ${errors.join(', ')}`);
   }
 }
 
-/**
- * 生成标准方法签名示例
- */
-function generateStandardSignature(methodName: string, pathParams: string[], httpMethod: HttpMethod = HttpMethod.GET, actualPath?: string): string {
-  // 生成方法名对应的Request/Response类型名
-  const capitalizedMethodName = methodName.charAt(0).toUpperCase() + methodName.slice(1);
-  const requestTypeName = `${capitalizedMethodName}Request`;
-  const responseTypeName = `${capitalizedMethodName}Response`;
-  
-  // 使用实际路径，如果没有提供则使用示例路径
-  const displayPath = actualPath || `/example/path${pathParams.map(p => `/{${p}}`).join('')}`;
-  
-  // 标准签名格式
-  return `    @${httpMethod.toUpperCase()}('${displayPath}')\n` +
-         `    async ${methodName}(request: ${requestTypeName}, ...options: APIOption[]): Promise<${responseTypeName}>`;
-}
+// =======================
+// HTTP 方法装饰器
+// =======================
 
 /**
- * 验证装饰器路径格式
- * @param path 路径字符串
- * @param decoratorName 装饰器名称（用于错误信息）
- */
-function validateDecoratorPath(path: string, decoratorName: string): void {
-  // 🚀 检查开关：如果禁用验证，直接返回
-  if (!isValidationEnabled()) {
-    return;
-  }
-  
-  // 检查是否为空字符串
-  if (path === '') {
-    throw new Error(
-      `@${decoratorName} 路径不能为空。` +
-      `\n  建议使用: @${decoratorName}('/') 表示根路径`
-    );
-  }
-  
-  // 检查是否只包含空白字符
-  if (path.trim() === '') {
-    throw new Error(
-      `@${decoratorName} 路径不能只包含空白字符。` +
-      `\n  当前值: "${path}"` +
-      `\n  建议使用: @${decoratorName}('/') 表示根路径`
-    );
-  }
-  
-  // 检查是否以 / 开头
-  if (!path.startsWith('/')) {
-    throw new Error(
-      `@${decoratorName} 路径必须以 '/' 开头。` +
-      `\n  当前值: "${path}"` +
-      `\n  建议修改为: "/${path}"` +
-      `\n  示例: @${decoratorName}('/api/users') 而非 @${decoratorName}('api/users')`
-    );
-  }
-  
-  // 检查是否包含连续的斜杠
-  if (path !== '/' && path.includes('//')) {
-    throw new Error(
-      `@${decoratorName} 路径不能包含连续的斜杠。` +
-      `\n  当前值: "${path}"` +
-      `\n  建议修改为: "${path.replace(/\/+/g, '/')}"`
-    );
-  }
-  
-  // 检查是否以 / 结尾（除了根路径 / 这个特殊情况）
-  if (path !== '/' && path.endsWith('/')) {
-    throw new Error(
-      `@${decoratorName} 路径不能以 '/' 结尾（根路径 '/' 除外）。` +
-      `\n  当前值: "${path}"` +
-      `\n  建议修改为: "${path.slice(0, -1)}"` +
-      `\n  示例: @${decoratorName}('/api/users') 而非 @${decoratorName}('/api/users/')`
-    );
-  }
-}
-
-/**
- * 创建兼容 TypeScript 5.x 的 HTTP 方法装饰器
- * 
- * 这个实现同时支持：
- * 1. TypeScript 5.x 新装饰器语法（Stage 3）
- * 2. TypeScript 4.x 旧装饰器语法（Legacy/Experimental）
+ * 创建 HTTP 方法装饰器
  */
 function createHttpMethodDecorator(method: HttpMethod) {
   return function(path: string, options?: DecoratorOptions) {
-    // 验证路径格式
-    validateDecoratorPath(path, method.toUpperCase());
+    // 简单路径验证
+    validatePath(path, method.toUpperCase());
     
-    // 返回一个装饰器函数，它能同时处理新旧装饰器语法
-    return function(target: any, context?: string | PropertyDescriptor | any): any {
-      let propertyKey: string;
-      let descriptor: PropertyDescriptor | undefined;
-
-      // 检测装饰器语法类型
-      if (typeof context === 'string') {
-        // 旧装饰器语法：(target, propertyKey, descriptor)
-        propertyKey = context;
-        descriptor = arguments[2] as PropertyDescriptor;
-      } else if (context && typeof context === 'object' && context !== null) {
-        if ('kind' in context && context.kind === 'method') {
-          // TypeScript 5.x 新装饰器语法
-          propertyKey = String(context.name);
-        } else {
-          // 旧装饰器语法：context 是 PropertyDescriptor
-          propertyKey = String(arguments[1]);
-          descriptor = context as PropertyDescriptor;
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+      // 验证参数装饰器
+      validateParameterDecorators(path, method, target, propertyKey);
+      
+      // 替换方法实现
+      descriptor.value = async function<Request, Response>(...args: any[]): Promise<Response> {
+        const paramMetadata: ParameterMetadataMap = Reflect.getMetadata(PARAM_METADATA_KEY, target, propertyKey) || {};
+        
+        // 解析参数
+        let pathParamValues: Record<string, string> = {};
+        let queryParamValues: Record<string, string> = {};
+        let request: Request | undefined = undefined;
+        let responseType: (new (...args: any[]) => Response) | undefined = undefined;
+        let options: APIOption[] = [];
+        
+        // 根据装饰器元数据分配参数
+        Object.keys(paramMetadata).forEach(indexStr => {
+          const index = parseInt(indexStr);
+          const meta = paramMetadata[index];
+          const arg = args[index];
+          
+          switch (meta.type) {
+            case 'param':
+              if (meta.paramName) {
+                pathParamValues[meta.paramName] = String(arg);
+              }
+              break;
+            case 'query':
+              // @Query() 参数是查询参数对象
+              if (arg && typeof arg === 'object') {
+                queryParamValues = { ...queryParamValues, ...arg };
+              }
+              break;
+            case 'request':
+              request = arg;
+              break;
+            case 'responseType':
+              responseType = arg;
+              break;
+            case 'options':
+              // @Options() ...options 是 rest参数，需要收集所有剩余参数
+              options = args.slice(index) || [];
+              break;
+          }
+        });
+        
+        // 🎯 自动生成 options，放到用户 options 最后
+        const generatedOptions: APIOption[] = [...options];
+        
+        // 如果有路径参数，自动生成 withParams option
+        if (Object.keys(pathParamValues).length > 0) {
+          generatedOptions.push(withParams(pathParamValues));
         }
-      } else {
-        // 回退处理 - 旧装饰器语法
-        propertyKey = String(arguments[1]);
-        descriptor = arguments[2] as PropertyDescriptor;
-      }
-
-      // 验证标准API方法签名格式
-      try {
-        validateStandardMethodSignature(path, method, target, propertyKey, descriptor);
-      } catch (error) {
-        // 重新抛出错误，保持错误信息完整
-        throw error;
-      }
-
-      // 确保 target.constructor 存在
+        
+        // 如果有查询参数，自动生成 withQuery option
+        if (Object.keys(queryParamValues).length > 0) {
+          generatedOptions.push(withQuery(queryParamValues));
+        }
+        
+        // 转换请求数据
+        let processedRequest = request;
+        if (request && typeof request === 'object') {
+          processedRequest = request;
+        }
+        
+        // 调用现有的 executeRequest，传入原始路径和生成的 options
+        const rawResponse = await (this as any).executeRequest(
+          method.toUpperCase(),
+          path,                    // 原始路径，由 executeRequest 处理替换
+          processedRequest,
+          responseType!,
+          generatedOptions         // 包含自动生成的 withParams
+        );
+        
+        // 转换响应数据
+        if (responseType && typeof responseType === 'function') {
+          const transformedResponse = plainToClass(responseType, rawResponse);
+          
+          // 可选验证
+          if (isValidationEnabled() && transformedResponse && typeof transformedResponse === 'object') {
+            const errors = await validate(transformedResponse as object);
+            if (errors.length > 0) {
+              console.warn('Response validation warnings:', errors);
+            }
+          }
+          
+          return transformedResponse as Response;
+        }
+        
+        return rawResponse as Response;
+      };
+      
+      // 存储方法元数据
       const targetConstructor = target.constructor || target;
-
-      // 保存装饰器元数据
       if (!targetConstructor[API_METHODS_KEY]) {
         targetConstructor[API_METHODS_KEY] = [];
       }
-
+      
       const metadata: APIMethodMetadata = {
         name: propertyKey,
         method,
-        path, // Use original path after validation
+        path,
         options
       };
-
+      
       targetConstructor[API_METHODS_KEY].push(metadata);
-
-      // 对于新装饰器语法，返回 void
-      if (context && typeof context === 'object' && context !== null && 'kind' in context && context.kind === 'method') {
-        return;
-      }
-
-      // 对于旧装饰器语法，返回 undefined
-      return;
     };
   };
 }
 
-// 导出 HTTP 方法装饰器
+// =======================
+// 导出装饰器
+// =======================
+
 export const GET = createHttpMethodDecorator(HttpMethod.GET);
 export const POST = createHttpMethodDecorator(HttpMethod.POST);
 export const PUT = createHttpMethodDecorator(HttpMethod.PUT);
@@ -385,48 +362,22 @@ export const HEAD = createHttpMethodDecorator(HttpMethod.HEAD);
 export const OPTIONS = createHttpMethodDecorator(HttpMethod.OPTIONS);
 
 /**
- * 兼容 TypeScript 5.x 的 @RootUri 装饰器
+ * RootUri 装饰器
  */
 export function RootUri(rootUri: string) {
-  return function<T extends { new(...args: any[]): {} }>(target: T, context?: any): T {
-    // 验证路径格式
-    validateDecoratorPath(rootUri, 'RootUri');
-    
-    // 检测装饰器语法类型
-    if (context && typeof context === 'object' && context !== null && 'kind' in context) {
-      // TypeScript 5.x 新装饰器语法
-      if (context.kind === 'class') {
-        // 使用新的元数据系统
-        const originalTarget = target;
-        
-        // 保存根路径信息
-        (originalTarget as any)[ROOT_URI_KEY] = rootUri;
-        
-        // 注册到全局映射表
-        if (!(globalThis as any)[GLOBAL_ROOT_URIS_KEY]) {
-          (globalThis as any)[GLOBAL_ROOT_URIS_KEY] = new Map();
-        }
-        (globalThis as any)[GLOBAL_ROOT_URIS_KEY].set(originalTarget.name, rootUri);
-        
-        return originalTarget;
-      }
-    } else {
-      // TypeScript 4.x 旧装饰器语法
-      (target as any)[ROOT_URI_KEY] = rootUri;
-      
-      // 注册到全局映射表
-      if (!(globalThis as any)[GLOBAL_ROOT_URIS_KEY]) {
-        (globalThis as any)[GLOBAL_ROOT_URIS_KEY] = new Map();
-      }
-      (globalThis as any)[GLOBAL_ROOT_URIS_KEY].set(target.name, rootUri);
-    }
-    
+  return function<T extends { new(...args: any[]): {} }>(target: T): T {
+    validatePath(rootUri, 'RootUri');
+    target.prototype[ROOT_URI_KEY] = rootUri;
     return target;
   };
 }
 
+// =======================
+// 工具函数
+// =======================
+
 /**
- * 获取类的 API 方法元数据
+ * 获取 API 方法元数据
  */
 export function getAPIMethodsMetadata(target: any): APIMethodMetadata[] {
   const constructor = target.constructor || target;
@@ -434,15 +385,8 @@ export function getAPIMethodsMetadata(target: any): APIMethodMetadata[] {
 }
 
 /**
- * 获取Client类的根路径
+ * 获取 Root URI
  */
-export function getRootUri(clientClass: any): string | null {
-  return clientClass[ROOT_URI_KEY] || null;
-}
-
-/**
- * 获取所有SDK到服务器的映射
- */
-export function getAllRootUriMappings(): Map<string, string> {
-  return (globalThis as any)[GLOBAL_ROOT_URIS_KEY] || new Map();
+export function getRootUri(target: any): string | undefined {
+  return target[ROOT_URI_KEY];
 }
