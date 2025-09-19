@@ -101,40 +101,58 @@ function validateStandardMethodSignature(path, method, target, propertyKey, desc
     if (currentParam.trim()) {
         params.push(currentParam.trim());
     }
+    // 验证标准方法签名格式
+    const pathParams = extractPathParameters(path);
     // 分析参数类型
     const requestParams = [];
     const optionsParams = [];
     const otherParams = [];
     params.forEach(param => {
         const cleanParam = param.trim();
+        const paramName = cleanParam.split(':')[0].trim();
         if (cleanParam.startsWith('...')) {
             // 任何以 ... 开头的参数都被认为是 options 参数
             optionsParams.push(cleanParam);
         }
-        else if (cleanParam.includes('Request') || cleanParam.split(':')[0].trim() === 'request' || cleanParam.split(':')[0].trim().startsWith('request')) {
-            // 包含 "Request" 的类型、参数名为 "request" 或以 "request" 开头的都被认为是 request 参数
+        else if (cleanParam.includes('Request')) {
+            // 包含 "Request" 的类型被认为是 request 参数
             requestParams.push(cleanParam);
         }
         else {
-            otherParams.push(cleanParam);
+            // 对于非路径参数的其他参数，也可能是错误命名的 request 参数
+            if (!pathParams.includes(paramName)) {
+                // 如果不是路径参数，很可能是应该叫 "request" 的参数
+                requestParams.push(cleanParam);
+            }
+            else {
+                otherParams.push(cleanParam);
+            }
         }
     });
-    // 验证标准方法签名格式
-    const pathParams = extractPathParameters(path);
     const errors = [];
     const suggestions = [];
+    // 生成方法名对应的类型名（用于错误信息）
+    const capitalizedMethodName = propertyKey.charAt(0).toUpperCase() + propertyKey.slice(1);
     // 首先检查request参数数量（优先级最高）
     if (requestParams.length > 1) {
         errors.push(`只能有一个 request 参数，发现 ${requestParams.length} 个`);
     }
     else if (requestParams.length === 1) {
         const requestParam = requestParams[0];
-        // 如果有类型声明，检查类型是否以 "Request" 结尾
-        if (requestParam.includes(':') && !requestParam.includes('Request')) {
-            errors.push(`request 参数类型应该以 "Request" 结尾`);
-            suggestions.push(`例如: request: GetKOLSocialDataRequest`);
+        // 检查是否有类型声明
+        if (!requestParam.includes(':')) {
+            errors.push(`request 参数必须有类型声明`);
+            suggestions.push(`建议格式: data: ${capitalizedMethodName}Request`);
         }
-        // 如果没有类型声明，只要参数名是 "request" 就可以接受
+        else if (!requestParam.includes('Request')) {
+            // 如果有类型声明，检查类型是否以 "Request" 结尾
+            errors.push(`request 参数类型必须以 "Request" 结尾`);
+            suggestions.push(`建议格式: data: ${capitalizedMethodName}Request`);
+        }
+    }
+    else if (requestParams.length === 0 && otherParams.length === 0) {
+        // 如果没有任何非options参数，对于某些GET请求这是允许的
+        // 不报错
     }
     // 检查options参数格式
     if (optionsParams.length > 1) {
@@ -157,8 +175,8 @@ function validateStandardMethodSignature(path, method, target, propertyKey, desc
             return !pathParams.includes(paramName);
         });
         if (nonPathParams.length > 0) {
-            errors.push(`发现非标准参数 [${nonPathParams.join(', ')}]`);
-            suggestions.push(`只允许 request 对象和 ...options 参数`);
+            errors.push(`参数类型缺少类型声明或类型不以 "Request" 结尾: [${nonPathParams.join(', ')}]`);
+            suggestions.push(`请为参数添加类型声明，格式：data: ${capitalizedMethodName}Request`);
         }
     }
     // 如果有错误，提供完整的错误信息
@@ -168,7 +186,6 @@ function validateStandardMethodSignature(path, method, target, propertyKey, desc
             : `无路径参数`;
         const standardSignature = generateStandardSignature(propertyKey, pathParams, method, path);
         // 生成实际的Response类型名
-        const capitalizedMethodName = propertyKey.charAt(0).toUpperCase() + propertyKey.slice(1);
         const responseTypeName = `${capitalizedMethodName}Response`;
         throw new Error(`🚫 @${method.toUpperCase()} 方法签名格式错误\n\n` +
             `${errors.map(error => `❌ ${error}`).join('\n')}\n\n` +
@@ -178,7 +195,8 @@ function validateStandardMethodSignature(path, method, target, propertyKey, desc
             `📚 说明:\n` +
             `   • 路径参数通过 withParams() 在调用时提供\n` +
             `   • 方法只接受 request 对象和 ...options 参数\n` +
-            `   • request 类型必须以 "Request" 结尾\n` +
+            `   • request 参数类型必须以 "Request" 结尾\n` +
+            `   • 建议格式：data: ${capitalizedMethodName}Request\n` +
             `   • 返回类型必须是 Promise<${responseTypeName}>\n\n` +
             (suggestions.length > 0 ? `🔧 建议:\n${suggestions.map(s => `   • ${s}`).join('\n')}` : ''));
     }
@@ -195,7 +213,7 @@ function generateStandardSignature(methodName, pathParams, httpMethod = HttpMeth
     const displayPath = actualPath || `/example/path${pathParams.map(p => `/{${p}}`).join('')}`;
     // 标准签名格式
     return `    @${httpMethod.toUpperCase()}('${displayPath}')\n` +
-        `    async ${methodName}(request: ${requestTypeName}, ...options: APIOption[]): Promise<${responseTypeName}>`;
+        `    async ${methodName}(data: ${requestTypeName}, ...options: APIOption[]): Promise<${responseTypeName}>`;
 }
 /**
  * 验证装饰器路径格式
