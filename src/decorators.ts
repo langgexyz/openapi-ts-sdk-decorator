@@ -198,7 +198,11 @@ function validateStandardMethodSignature(path: string, method: HttpMethod, targe
       ? `路径参数: {${pathParams.join('}, {')}}`
       : `无路径参数`;
     
-    const standardSignature = generateStandardSignature(propertyKey, pathParams, method);
+    const standardSignature = generateStandardSignature(propertyKey, pathParams, method, path);
+    
+    // 生成实际的Response类型名
+    const capitalizedMethodName = propertyKey.charAt(0).toUpperCase() + propertyKey.slice(1);
+    const responseTypeName = `${capitalizedMethodName}Response`;
     
     throw new Error(
       `🚫 @${method.toUpperCase()} 方法签名格式错误\n\n` +
@@ -210,7 +214,7 @@ function validateStandardMethodSignature(path: string, method: HttpMethod, targe
       `   • 路径参数通过 withParams() 在调用时提供\n` +
       `   • 方法只接受 request 对象和 ...options 参数\n` +
       `   • request 类型必须以 "Request" 结尾\n` +
-      `   • 返回类型必须是 Promise<SomeResponse>\n\n` +
+      `   • 返回类型必须是 Promise<${responseTypeName}>\n\n` +
       (suggestions.length > 0 ? `🔧 建议:\n${suggestions.map(s => `   • ${s}`).join('\n')}` : '')
     );
   }
@@ -219,14 +223,17 @@ function validateStandardMethodSignature(path: string, method: HttpMethod, targe
 /**
  * 生成标准方法签名示例
  */
-function generateStandardSignature(methodName: string, pathParams: string[], httpMethod: HttpMethod = HttpMethod.GET): string {
+function generateStandardSignature(methodName: string, pathParams: string[], httpMethod: HttpMethod = HttpMethod.GET, actualPath?: string): string {
   // 生成方法名对应的Request/Response类型名
   const capitalizedMethodName = methodName.charAt(0).toUpperCase() + methodName.slice(1);
   const requestTypeName = `${capitalizedMethodName}Request`;
   const responseTypeName = `${capitalizedMethodName}Response`;
   
+  // 使用实际路径，如果没有提供则使用示例路径
+  const displayPath = actualPath || `/example/path${pathParams.map(p => `/{${p}}`).join('')}`;
+  
   // 标准签名格式
-  return `    @${httpMethod.toUpperCase()}('/your/path${pathParams.map(p => `/{${p}}`).join('')}')\n` +
+  return `    @${httpMethod.toUpperCase()}('${displayPath}')\n` +
          `    async ${methodName}(request: ${requestTypeName}, ...options: APIOption[]): Promise<${responseTypeName}>`;
 }
 
