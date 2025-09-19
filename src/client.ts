@@ -8,11 +8,14 @@
 import { HttpBuilder, HttpMethod } from 'openapi-ts-sdk';
 import { plainToClass, instanceToPlain } from 'class-transformer';
 import { validate } from 'class-validator';
+import { OpenAPINamingRule } from './rules';
 
 // API 配置接口
 export interface APIConfig {
   uri: string;           // 请求 URI（每个方法都有默认值，可通过 withUri 覆盖）
   headers: Record<string, string>;  // 请求 headers（默认包含 Content-Type）
+  params?: Record<string, string>; // 路径参数（用于替换 URL 中的 {param}）
+  query?: string;        // 查询字符串（添加到 URL 后面，由 withQuery 生成）
 }
 
 // 函数式选项类型
@@ -29,6 +32,48 @@ export const withHeaders = (headers: Record<string, string>): APIOption => (conf
 
 export const withHeader = (key: string, value: string): APIOption => (config) => {
   config.headers = { ...config.headers, [key]: value };
+};
+
+/**
+ * 设置路径参数的 APIOption
+ * 用于动态替换 URL 路径中的参数，如 /users/{id} -> /users/123
+ * 
+ * @param params - 路径参数的键值对
+ * @returns APIOption 函数
+ * 
+ * @example
+ * // 对于路径 /users/{id}/posts/{postId}
+ * withParams({ id: '123', postId: '456' })
+ * // 结果：/users/123/posts/456
+ */
+export const withParams = (params: Record<string, string>): APIOption => (config) => {
+  config.params = { ...config.params, ...params };
+};
+
+/**
+ * 设置查询参数的 APIOption
+ * 用于在 URL 后添加查询字符串
+ * 
+ * @param query - 查询参数的键值对或查询字符串
+ * @returns APIOption 函数
+ * 
+ * @example
+ * withQuery({ page: '1', size: '10' })
+ * // 结果：?page=1&size=10
+ * 
+ * withQuery('page=1&size=10')
+ * // 结果：?page=1&size=10
+ */
+export const withQuery = (query: Record<string, string> | string): APIOption => (config) => {
+  if (typeof query === 'string') {
+    config.query = query;
+  } else {
+    const queryString = Object.entries(query)
+      .filter(([_, value]) => value !== undefined && value !== null)
+      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+      .join('&');
+    config.query = queryString;
+  }
 };
 
 // 组合选项
@@ -153,6 +198,63 @@ ${errors.map(error => `❌ ${error}`).join('\n')}
   }
 
   /**
+   * 验证路径参数的辅助方法
+   * @private
+   */
+  private validatePathParameters(uri: string, params?: Record<string, string>): void {
+    // 提取路径中的参数占位符
+    const pathParameters = OpenAPINamingRule.extractPathParameters(uri);
+    
+    if (!params) params = {};
+    
+    // 验证提供的参数是否与路径参数匹配
+    const providedParams = Object.keys(params);
+    const missingParams = pathParameters.filter(param => !providedParams.includes(param));
+    const extraParams = providedParams.filter(param => !pathParameters.includes(param));
+    
+    const errors: string[] = [];
+    
+    if (missingParams.length > 0) {
+      errors.push(`缺少必需的路径参数: ${missingParams.join(', ')}`);
+    }
+    
+    if (extraParams.length > 0) {
+      errors.push(`提供了不存在的路径参数: ${extraParams.join(', ')}`);
+    }
+    
+    if (errors.length > 0) {
+      const pathInfo = pathParameters.length > 0 
+        ? `路径 "${uri}" 需要参数: {${pathParameters.join('}, {')}}`
+        : `路径 "${uri}" 不需要任何参数`;
+      
+      throw new Error(
+        `🚫 路径参数验证失败\n\n` +
+        `${errors.map(error => `❌ ${error}`).join('\n')}\n\n` +
+        `📋 ${pathInfo}\n` +
+        `💡 请确保提供的参数与路径中的占位符完全匹配`
+      );
+    }
+  }
+
+  /**
+   * 替换路径参数的辅助方法
+   * @private
+   */
+  private replacePathParameters(uri: string, params?: Record<string, string>): string {
+    if (!params || Object.keys(params).length === 0) {
+      return uri;
+    }
+    
+    let replacedUri = uri;
+    Object.entries(params).forEach(([key, value]) => {
+      const placeholder = `{${key}}`;
+      replacedUri = replacedUri.replace(placeholder, encodeURIComponent(value));
+    });
+    
+    return replacedUri;
+  }
+
+  /**
    * 执行HTTP请求
    * @protected
    */
@@ -180,9 +282,15 @@ ${errors.map(error => `❌ ${error}`).join('\n')}
     // 应用所有选项
     options.forEach(option => option(config));
     
+    // 🔍 验证路径参数（在所有选项应用完毕后）
+    this.validatePathParameters(config.uri, config.params);
+    
+    // 🔄 替换路径参数
+    const finalUri = this.replacePathParameters(config.uri, config.params);
+    
     // 构建 HTTP 请求
     const httpBuilder = this.httpBuilder
-      .setUri(config.uri)
+      .setUri(finalUri)
       .setMethod(method);
     
     // 添加 headers

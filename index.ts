@@ -14,5 +14,8 @@ export * from './src/decorators';
 // Export base client and utilities
 export * from './src/client';
 
+// Export validation decorators (TypeScript 5.x compatible)
+export * from './src/validation';
+
 // Re-export commonly used types from dependencies
 export { HttpMethod } from 'openapi-ts-sdk';

@@ -7,5 +7,6 @@
 export * from './src/rules';
 export * from './src/decorators';
 export * from './src/client';
+export * from './src/validation';
 export { HttpMethod } from 'openapi-ts-sdk';
 //# sourceMappingURL=index.d.ts.map

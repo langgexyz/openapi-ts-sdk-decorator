@@ -12,6 +12,8 @@ exports.RootUri = RootUri;
 exports.getAPIMethodsMetadata = getAPIMethodsMetadata;
 exports.getRootUri = getRootUri;
 exports.getAllRootUriMappings = getAllRootUriMappings;
+exports.Query = Query;
+exports.Body = Body;
 const openapi_ts_sdk_1 = require("openapi-ts-sdk");
 /**
  * 装饰器命名空间常量
@@ -20,6 +22,124 @@ const DECORATOR_NAMESPACE = '__openapi_ts_sdk_decorator_';
 const API_METHODS_KEY = `${DECORATOR_NAMESPACE}apiMethods`;
 const ROOT_URI_KEY = `${DECORATOR_NAMESPACE}rootUri`;
 const GLOBAL_ROOT_URIS_KEY = `${DECORATOR_NAMESPACE}rootUris`;
+/**
+ * 提取路径中的参数
+ * @param path 路径字符串
+ * @returns 路径参数数组
+ */
+function extractPathParameters(path) {
+    const matches = path.match(/\{([^}]+)\}/g) || [];
+    return matches.map(match => match.slice(1, -1));
+}
+/**
+ * 验证方法参数与路径参数的匹配关系
+ * @param path 路径字符串
+ * @param method HTTP方法
+ * @param target 目标对象
+ * @param propertyKey 方法名
+ * @param descriptor 属性描述符（可能包含方法函数）
+ */
+function validateMethodParameters(path, method, target, propertyKey, descriptor) {
+    const pathParams = extractPathParameters(path);
+    // 获取方法的参数信息
+    // 优先从 descriptor 获取，然后从 target 获取
+    let methodFunction;
+    if (descriptor && descriptor.value && typeof descriptor.value === 'function') {
+        methodFunction = descriptor.value;
+    }
+    else {
+        methodFunction = target[propertyKey] ||
+            (target.constructor && target.constructor.prototype && target.constructor.prototype[propertyKey]);
+    }
+    if (!methodFunction || typeof methodFunction !== 'function') {
+        // 如果是装饰器应用时，方法可能还没有定义，暂时跳过验证
+        // 这种情况下，我们需要在实际使用时进行验证
+        return;
+    }
+    // 获取函数参数名（通过字符串解析）
+    const funcStr = methodFunction.toString();
+    const paramMatch = funcStr.match(/\(([^)]*)\)/);
+    if (!paramMatch)
+        return;
+    const paramStr = paramMatch[1].trim();
+    if (!paramStr && pathParams.length > 0) {
+        // 如果有路径参数但方法没有参数，这是错误的
+        throw new Error(`@${method.toUpperCase()} 路径参数验证失败：路径中定义了参数 [${pathParams.join(', ')}] 但方法 ${propertyKey} 没有任何参数。` +
+            `\n  路径: "${path}"` +
+            `\n  建议: 在方法签名中添加对应的参数`);
+    }
+    if (!paramStr)
+        return;
+    // 解析参数列表
+    const params = [];
+    let currentParam = '';
+    let bracketCount = 0;
+    let inString = false;
+    let stringChar = '';
+    for (let i = 0; i < paramStr.length; i++) {
+        const char = paramStr[i];
+        if (!inString && (char === '"' || char === "'")) {
+            inString = true;
+            stringChar = char;
+            currentParam += char;
+        }
+        else if (inString && char === stringChar) {
+            inString = false;
+            currentParam += char;
+        }
+        else if (!inString && char === '{') {
+            bracketCount++;
+            currentParam += char;
+        }
+        else if (!inString && char === '}') {
+            bracketCount--;
+            currentParam += char;
+        }
+        else if (!inString && char === ',' && bracketCount === 0) {
+            params.push(currentParam.trim());
+            currentParam = '';
+        }
+        else {
+            currentParam += char;
+        }
+    }
+    if (currentParam.trim()) {
+        params.push(currentParam.trim());
+    }
+    // 过滤掉 options 参数（以 ... 开头的参数）
+    const normalParams = params.filter(param => {
+        const cleanParam = param.replace(/\s*:\s*[^,]+$/, ''); // 移除类型声明
+        return !cleanParam.startsWith('...') && !cleanParam.includes('APIOption');
+    });
+    // 提取参数名（移除类型声明和可选标记）
+    const paramNames = normalParams.map(param => {
+        const name = param.split(':')[0].trim().replace(/[?]$/, '');
+        return name;
+    });
+    // 检查路径参数是否都在方法参数中
+    const missingPathParams = pathParams.filter(pathParam => !paramNames.includes(pathParam));
+    if (missingPathParams.length > 0) {
+        throw new Error(`@${method.toUpperCase()} 路径参数验证失败：路径中的参数 [${missingPathParams.join(', ')}] 在方法 ${propertyKey} 的参数列表中未找到。` +
+            `\n  路径: "${path}"` +
+            `\n  路径参数: [${pathParams.join(', ')}]` +
+            `\n  方法参数: [${paramNames.join(', ')}]` +
+            `\n  建议: 确保所有路径参数都在方法签名中定义`);
+    }
+    // 检查多余的参数（除了路径参数之外的参数）
+    const extraParams = paramNames.filter(paramName => !pathParams.includes(paramName));
+    // 简化验证：只支持路径参数和一个 Request 对象
+    // 允许的参数模式：
+    // 1. 路径参数 (从 URL 路径中提取，如 {id}, {userId})
+    // 2. 一个 Request 对象 (包含所有查询参数或请求体数据)
+    // 3. ...options (APIOption[]) - 总是允许
+    // 过滤掉 options 参数（以 ...options 形式出现）
+    const nonOptionsParams = extraParams.filter(param => param !== 'options');
+    // 允许最多一个非路径参数（Request 对象）
+    if (nonOptionsParams.length > 1) {
+        console.warn(`⚠️  @${method.toUpperCase()} 参数提示：方法 ${propertyKey} 中有多个非路径参数 [${nonOptionsParams.join(', ')}]。` +
+            `\n  建议的参数模式: async ${propertyKey}(${pathParams.map(p => `${p}: string`).join(', ')}${pathParams.length > 0 ? ', ' : ''}request: SomeRequest, ...options: APIOption[])`);
+    }
+}
 /**
  * 验证装饰器路径格式
  * @param path 路径字符串
@@ -95,6 +215,15 @@ function createHttpMethodDecorator(method) {
                 propertyKey = String(arguments[1]);
                 descriptor = arguments[2];
             }
+            // 验证方法参数与路径参数的匹配关系
+            // 暂时禁用参数验证，简化使用
+            // try {
+            //   // 传递 descriptor 以便获取真正的方法函数
+            //   validateMethodParameters(path, method, target, propertyKey, descriptor);
+            // } catch (error) {
+            //   // 重新抛出错误，保持错误信息完整
+            //   throw error;
+            // }
             // 确保 target.constructor 存在
             const targetConstructor = target.constructor || target;
             // 保存装饰器元数据
@@ -178,5 +307,23 @@ function getRootUri(clientClass) {
  */
 function getAllRootUriMappings() {
     return globalThis[GLOBAL_ROOT_URIS_KEY] || new Map();
+}
+/**
+ * @Query 装饰器 - 标记参数为查询参数
+ */
+function Query(name) {
+    return function (target, propertyKey, parameterIndex) {
+        // 这里可以存储查询参数的元数据
+        // 暂时作为占位符实现
+    };
+}
+/**
+ * @Body 装饰器 - 标记参数为请求体
+ */
+function Body() {
+    return function (target, propertyKey, parameterIndex) {
+        // 这里可以存储请求体参数的元数据
+        // 暂时作为占位符实现
+    };
 }
 //# sourceMappingURL=decorators.js.map
