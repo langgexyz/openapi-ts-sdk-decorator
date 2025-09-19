@@ -142,12 +142,12 @@ function validateStandardMethodSignature(path, method, target, propertyKey, desc
         // 检查是否有类型声明
         if (!requestParam.includes(':')) {
             errors.push(`request 参数必须有类型声明`);
-            suggestions.push(`建议格式: data: ${capitalizedMethodName}Request`);
+            suggestions.push(`建议格式: request: ${capitalizedMethodName}Request`);
         }
         else if (!requestParam.includes('Request')) {
             // 如果有类型声明，检查类型是否以 "Request" 结尾
             errors.push(`request 参数类型必须以 "Request" 结尾`);
-            suggestions.push(`建议格式: data: ${capitalizedMethodName}Request`);
+            suggestions.push(`建议格式: request: ${capitalizedMethodName}Request`);
         }
     }
     else if (requestParams.length === 0 && otherParams.length === 0) {
@@ -176,7 +176,7 @@ function validateStandardMethodSignature(path, method, target, propertyKey, desc
         });
         if (nonPathParams.length > 0) {
             errors.push(`参数类型缺少类型声明或类型不以 "Request" 结尾: [${nonPathParams.join(', ')}]`);
-            suggestions.push(`请为参数添加类型声明，格式：data: ${capitalizedMethodName}Request`);
+            suggestions.push(`请为参数添加类型声明，格式：request: ${capitalizedMethodName}Request`);
         }
     }
     // 如果有错误，提供完整的错误信息
@@ -196,7 +196,7 @@ function validateStandardMethodSignature(path, method, target, propertyKey, desc
             `   • 路径参数通过 withParams() 在调用时提供\n` +
             `   • 方法只接受 request 对象和 ...options 参数\n` +
             `   • request 参数类型必须以 "Request" 结尾\n` +
-            `   • 建议格式：data: ${capitalizedMethodName}Request\n` +
+            `   • 建议格式：request: ${capitalizedMethodName}Request\n` +
             `   • 返回类型必须是 Promise<${responseTypeName}>\n\n` +
             (suggestions.length > 0 ? `🔧 建议:\n${suggestions.map(s => `   • ${s}`).join('\n')}` : ''));
     }
@@ -213,7 +213,7 @@ function generateStandardSignature(methodName, pathParams, httpMethod = HttpMeth
     const displayPath = actualPath || `/example/path${pathParams.map(p => `/{${p}}`).join('')}`;
     // 标准签名格式
     return `    @${httpMethod.toUpperCase()}('${displayPath}')\n` +
-        `    async ${methodName}(data: ${requestTypeName}, ...options: APIOption[]): Promise<${responseTypeName}>`;
+        `    async ${methodName}(request: ${requestTypeName}, ...options: APIOption[]): Promise<${responseTypeName}>`;
 }
 /**
  * 验证装饰器路径格式
