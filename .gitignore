@@ -8,6 +8,9 @@ yarn-error.log*
 build/
 *.tsbuildinfo
 
+# Keep dist for local file:// installations
+# dist/
+
 # Environment files
 .env
 .env.local
