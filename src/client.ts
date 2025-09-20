@@ -73,6 +73,11 @@ export abstract class APIClient {
       return;
     }
     
+    // 边界检查：确保responseType不为null/undefined
+    if (!responseType || typeof responseType !== 'function') {
+      return;
+    }
+    
     const requestTypeName = (request as any).constructor?.name || '';
     const responseTypeName = responseType.name;
     const errors: string[] = [];

@@ -27,6 +27,8 @@ __exportStar(require("./src/rules"), exports);
 __exportStar(require("./src/decorators"), exports);
 // Export base client and utilities
 __exportStar(require("./src/client"), exports);
+// Export runtime rule checking utilities
+__exportStar(require("./src/checkrule"), exports);
 // Re-export commonly used types from dependencies
 var openapi_ts_sdk_1 = require("openapi-ts-sdk");
 Object.defineProperty(exports, "HttpMethod", { enumerable: true, get: function () { return openapi_ts_sdk_1.HttpMethod; } });

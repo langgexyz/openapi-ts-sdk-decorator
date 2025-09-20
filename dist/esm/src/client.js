@@ -46,6 +46,10 @@ export class APIClient {
         if (!request || (typeof request === 'object' && Object.keys(request).length === 0 && request.constructor === Object)) {
             return;
         }
+        // 边界检查：确保responseType不为null/undefined
+        if (!responseType || typeof responseType !== 'function') {
+            return;
+        }
         const requestTypeName = request.constructor?.name || '';
         const responseTypeName = responseType.name;
         const errors = [];

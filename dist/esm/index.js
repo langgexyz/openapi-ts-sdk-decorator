@@ -10,5 +10,7 @@ export * from './src/rules';
 export * from './src/decorators';
 // Export base client and utilities
 export * from './src/client';
+// Export runtime rule checking utilities
+export * from './src/checkrule';
 // Re-export commonly used types from dependencies
 export { HttpMethod } from 'openapi-ts-sdk';
