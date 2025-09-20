@@ -2,16 +2,16 @@
   "name": "openapi-ts-sdk-decorator",
   "version": "1.1.0",
   "description": "OpenAPI TypeScript SDK decorators with parameter-based design - provides type-safe decorator system with automatic path/query parameter handling",
-  "main": "index.ts",
-  "types": "index.ts",
-  "exports": {
-    ".": "./index.ts"
-  },
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/types/index.d.ts",
   "files": [
-    "src/**/*",
+    "dist",
+    "src",
     "index.ts",
     "README.md",
-    "tsconfig.json"
+    "tsconfig.json",
+    "tsconfig.*.json"
   ],
   "keywords": [
     "openapi",
@@ -38,15 +38,19 @@
   "author": "langgexyz",
   "license": "MIT",
   "scripts": {
+    "build": "npm run build:cjs && npm run build:esm && npm run build:types",
+    "prebuild": "npm run clean",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:types": "tsc -p tsconfig.types.json",
+    "clean": "rm -rf dist node_modules/.cache coverage",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:decorators": "jest tests/decorators",
-    "test:validation": "jest tests/validation",
     "type-check": "tsc --noEmit",
     "type-check:watch": "tsc --noEmit --watch",
-    "lint": "tsc --noEmit --strict",
-    "clean": "rm -rf node_modules/.cache coverage"
+    "lint": "tsc --noEmit --strict"
   },
   "dependencies": {
     "class-transformer": "^0.5.1",

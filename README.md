@@ -38,12 +38,79 @@ OpenAPI TypeScript SDK decorators with parameter-based design - provides type-sa
 npm install openapi-ts-sdk-decorator
 ```
 
+## ⚙️ TypeScript 配置要求
+
+本包使用 **Legacy Decorators**，与 class-validator、NestJS 等主流库保持一致。
+
+```json
+// tsconfig.json - 必需配置
+{
+  "compilerOptions": {
+    "experimentalDecorators": true,    // 必需！启用 legacy decorators
+    "emitDecoratorMetadata": true,     // 必需！启用装饰器元数据
+    "target": "ES2020",                // 推荐
+    "useDefineForClassFields": false   // 推荐，避免装饰器冲突
+  }
+}
+```
+
+### 📋 版本支持
+- ✅ **TypeScript 4.9+ 到 5.x** - 完全支持
+- ✅ **Legacy Decorators** - 与生态保持统一  
+- ❌ TypeScript 5.x Stage 3 新装饰器 - 暂不支持
+
+```typescript
+// 应用入口必须导入
+import 'reflect-metadata';
+```
+
+## 📦 导入说明
+
+本包专注于 HTTP API 装饰器功能：
+
+```typescript
+// 🎆 HTTP 装饰器 - 从本包导入（核心功能）
+import { 
+  GET, POST, PUT, DELETE,           // HTTP 方法装饰器
+  Param, Query, Request, ResponseType, Options,  // 参数装饰器  
+  APIClient                         // 基础客户端类
+} from 'openapi-ts-sdk-decorator';
+
+// ✅ 验证装饰器 - 直接从 class-validator 导入
+import { 
+  IsString, IsNumber, IsEmail,      // 验证装饰器
+  MinLength, MaxLength, IsOptional  // 验证装饰器
+} from 'class-validator';
+
+// 🔧 核心功能 - 直接从原库导入
+import { validate, ValidationError } from 'class-validator';
+import { plainToClass, Transform } from 'class-transformer';
+```
+
+ℹ️ **为什么这样设计？**
+- **职责单一**：专注于 API 装饰器，不重复造轮子
+- **避免冲突**：与 class-validator 生态完全一致，零冲突
+- **简化维护**：不需要维护验证逻辑的重复实现
+
 ## 📚 完整使用示例
 
 ### 1. 基本类型定义
 
 ```typescript
-import { APIClient, GET, POST, Param, Query, Request, ResponseType, Options, APIOption } from 'openapi-ts-sdk-decorator';
+// 🎆 从本包导入 API 装饰器（核心功能）
+import { 
+  APIClient, GET, POST, PUT, DELETE,
+  Param, Query, Request, ResponseType, Options, APIOption 
+} from 'openapi-ts-sdk-decorator';
+
+// ✅ 验证装饰器直接从 class-validator 导入
+import { 
+  IsString, IsEmail, IsOptional, MinLength 
+} from 'class-validator';
+
+// 🔧 核心功能从原库导入
+import { validate, ValidationError } from 'class-validator';
+import { plainToClass } from 'class-transformer';
 
 // 请求类型
 interface GetUserRequest {
@@ -51,9 +118,16 @@ interface GetUserRequest {
   includeSettings?: boolean;
 }
 
-interface CreateUserRequest {
-  name: string;
-  email: string;
+class CreateUserRequest {
+  @IsString()
+  @MinLength(2)
+  name!: string;
+  
+  @IsEmail()
+  email!: string;
+  
+  @IsOptional()
+  @IsString()
   role?: string;
 }
 

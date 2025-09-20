@@ -1,8 +1,5 @@
 /**
  * Shared Rules for Code Generation and Runtime Validation
- * 
- * This file contains the abstract rules and interfaces that ensure
- * code generation and runtime validation use the same logic.
  */
 
 export interface APIOperation {
@@ -41,15 +38,7 @@ export interface NamingRule {
   validateMethodSignature(methodName: string, operation: APIOperation, actualArgs: any[]): ValidationResult;
 }
 
-/**
- * OpenAPI Naming Rule Implementation
- * 
- * This class implements the specific naming conventions for OpenAPI-based
- * TypeScript SDK generation and validation.
- */
 export class OpenAPINamingRuleImpl implements NamingRule {
-  
-  // HTTP method -> method prefix mapping
   private static HTTP_METHOD_PREFIXES: Record<string, string> = {
     'get': 'get',
     'post': 'create', 
@@ -58,7 +47,6 @@ export class OpenAPINamingRuleImpl implements NamingRule {
     'patch': 'patch'
   };
   
-  // Path segments to filter out
   private static FILTERED_SEGMENTS = ['api'];
   private static VERSION_PATTERN = /^v\d+$/i;
   
@@ -68,7 +56,6 @@ export class OpenAPINamingRuleImpl implements NamingRule {
     
     let methodName = `${methodPrefix}${resourceName}`;
     
-    // Use operation.parameters order for consistent parameter naming
     const pathParams = (operation.parameters || []).filter(p => p && p.in === 'path');
     if (pathParams.length > 0) {
       const paramSuffix = pathParams.map(p => 
@@ -99,18 +86,15 @@ export class OpenAPINamingRuleImpl implements NamingRule {
     
     let params: string[] = [];
     
-    // Path parameters
     pathParams.forEach(param => {
       params.push(`${param}: string`);
     });
     
-    // Request body parameter
     if (needsRequestBody) {
       const requestTypeName = this.generateRequestTypeName(this.generateMethodName(operation));
       params.push(`request: ${requestTypeName}`);
     }
     
-    // Options parameter
     params.push('...options: APIOption[]');
     
     const responseTypeName = this.generateResponseTypeName(this.generateMethodName(operation));
@@ -186,16 +170,13 @@ export class OpenAPINamingRuleImpl implements NamingRule {
     return { isValid: true, errors: [], suggestions: [] };
   }
   
-  // Private helper methods
   private getMethodPrefix(httpMethod: string): string {
     return OpenAPINamingRuleImpl.HTTP_METHOD_PREFIXES[httpMethod.toLowerCase()] || httpMethod.toLowerCase();
   }
   
   private extractResourceName(path: string): string {
-    // 移除路径参数 {param}，保留路径结构
     const cleanPath = path.replace(/\{[^}]+\}/g, '');
     
-    // 移除开头的 /api/ 等前缀，并分割成单词
     const pathSegments = cleanPath.split('/').filter(seg => 
       seg && !OpenAPINamingRuleImpl.FILTERED_SEGMENTS.includes(seg.toLowerCase()) &&
       !OpenAPINamingRuleImpl.VERSION_PATTERN.test(seg)
@@ -203,14 +184,10 @@ export class OpenAPINamingRuleImpl implements NamingRule {
     
     if (pathSegments.length === 0) return '';
     
-    // 将每个路径段分割成单词（处理驼峰、下划线、连字符）
     const words: string[] = [];
     pathSegments.forEach(segment => {
-      // 处理驼峰命名：systemId -> system, Id
       const camelWords = segment.replace(/([a-z])([A-Z])/g, '$1 $2');
-      // 处理下划线和连字符
       const splitWords = camelWords.split(/[-_]/);
-      // 转换为小写并过滤空字符串
       words.push(...splitWords.map(w => w.toLowerCase()).filter(w => w));
     });
     
@@ -230,5 +207,4 @@ export class OpenAPINamingRuleImpl implements NamingRule {
   }
 }
 
-// Export default instance for use in code generation and runtime validation
 export const OpenAPINamingRule = new OpenAPINamingRuleImpl();

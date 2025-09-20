@@ -1,18 +1,11 @@
 /**
  * OpenAPI TypeScript SDK Decorator Package
- * 
+ *
  * 专注于 HTTP API 装饰器，与 class-validator 生态保持完全一致
  * 验证装饰器请直接使用 class-validator
  */
-
-// Export shared rules and interfaces
 export * from './src/rules';
-
-// Export HTTP API decorators (核心功能)
 export * from './src/decorators';
-
-// Export base client and utilities
 export * from './src/client';
-
-// Re-export commonly used types from dependencies
 export { HttpMethod } from 'openapi-ts-sdk';
+//# sourceMappingURL=index.d.ts.map
