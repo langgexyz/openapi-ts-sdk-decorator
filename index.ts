@@ -5,11 +5,17 @@
  * 验证装饰器请直接使用 class-validator
  */
 
+// Export shared types and interfaces
+export * from './src/types';
+
 // Export shared rules and interfaces
 export * from './src/rules';
 
 // Export HTTP API decorators (核心功能)
 export * from './src/decorators';
+
+// Export URI builder utilities
+export * from './src/uri-builder';
 
 // Export base client and utilities
 export * from './src/client';

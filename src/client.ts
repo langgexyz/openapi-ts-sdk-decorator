@@ -5,17 +5,13 @@
 import { HttpBuilder, HttpMethod } from 'openapi-ts-sdk';
 import { plainToClass, instanceToPlain } from 'class-transformer';
 import { validate } from 'class-validator';
+import { getRootUri } from './decorators';
+import { APIConfig, APIOption } from './types';
+import { APIConfigURIBuilder } from './uri-builder';
 
-export interface APIConfig {
-  uri: string;
-  headers: Record<string, string>;
-  params?: Record<string, string>;
-  query?: Record<string, string>;
-}
-
-export type APIOption = (config: APIConfig) => void;
-export const withUri = (uri: string): APIOption => (config) => {
-  config.uri = uri;
+// === API Option 助手函数 ===
+export const withPath = (path: string): APIOption => (config) => {
+  config.path = path;
 };
 
 export const withHeaders = (headers: Record<string, string>): APIOption => (config) => {
@@ -30,12 +26,14 @@ export const withQuery = (query: Record<string, string>): APIOption => (config) 
   config.query = { ...config.query, ...query };
 };
 
-export const withHeader = (key: string, value: string): APIOption => (config) => {
-  config.headers = { ...config.headers, [key]: value };
+export const withRoot = (root: string): APIOption => (config) => {
+  config.root = root;
 };
+
 export const combineOptions = (...options: APIOption[]): APIOption => (config) => {
   options.forEach(option => option(config));
 };
+
 
 export abstract class APIClient {
   protected httpBuilder: HttpBuilder;
@@ -116,7 +114,7 @@ export abstract class APIClient {
   ): Promise<TResponse> {
     this.checkRequestResponseName<TRequest, TResponse>(request, responseType);
     const config: APIConfig = {
-      uri: path,
+      path,
       headers: {
         'Content-Type': 'application/json'
       }
@@ -124,25 +122,11 @@ export abstract class APIClient {
     
     options.forEach(option => option(config));
     
-    let finalUri = config.uri;
-    if (config.params && Object.keys(config.params).length > 0) {
-      Object.entries(config.params).forEach(([key, value]) => {
-        const placeholder = `{${key}}`;
-        finalUri = finalUri.replace(placeholder, encodeURIComponent(value));
-      });
-    }
-    
-    this.validateUri(finalUri);
-    if (config.query && Object.keys(config.query).length > 0) {
-      const queryString = Object.entries(config.query)
-        .filter(([_, value]) => value !== undefined && value !== null && value !== '')
-        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-        .join('&');
-      
-      if (queryString) {
-        finalUri += (finalUri.includes('?') ? '&' : '?') + queryString;
-      }
-    }
+    const root = getRootUri(this);
+    const finalUri = APIConfigURIBuilder
+      .from(config)
+      .withRoot(root)
+      .build();
     
     const httpBuilder = this.httpBuilder
       .setUri(finalUri)
@@ -151,10 +135,8 @@ export abstract class APIClient {
     Object.entries(config.headers).forEach(([key, value]) => {
       httpBuilder.addHeader(key, value);
     });
-    if (request) {
-      const requestJson = JSON.stringify(instanceToPlain(request));
-      httpBuilder.setContent(requestJson);
-    }
+
+    httpBuilder.setContent(JSON.stringify(instanceToPlain(request)));
     
     const http = httpBuilder.build();
     const [response, error] = await http.send();
@@ -172,12 +154,4 @@ export abstract class APIClient {
     return result;
   }
 
-  private validateUri(uri: string): void {
-    const unresolved = uri.match(/\{[^}]+\}/g);
-    
-    if (unresolved && unresolved.length > 0) {
-      const missingParams = unresolved.map(p => p.slice(1, -1));
-      throw new Error(`Missing path parameters: [${missingParams.join(', ')}] in URI: "${uri}"`);
-    }
-  }
 }

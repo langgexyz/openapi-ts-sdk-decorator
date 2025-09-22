@@ -4,8 +4,10 @@
  * 专注于 HTTP API 装饰器，与 class-validator 生态保持完全一致
  * 验证装饰器请直接使用 class-validator
  */
+export * from './src/types';
 export * from './src/rules';
 export * from './src/decorators';
+export * from './src/uri-builder';
 export * from './src/client';
 export * from './src/checkrule';
 export { HttpMethod } from 'openapi-ts-sdk';

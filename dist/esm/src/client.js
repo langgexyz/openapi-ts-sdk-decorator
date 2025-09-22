@@ -3,8 +3,11 @@
  */
 import { plainToClass, instanceToPlain } from 'class-transformer';
 import { validate } from 'class-validator';
-export const withUri = (uri) => (config) => {
-    config.uri = uri;
+import { getRootUri } from './decorators';
+import { APIConfigURIBuilder } from './uri-builder';
+// === API Option 助手函数 ===
+export const withPath = (path) => (config) => {
+    config.path = path;
 };
 export const withHeaders = (headers) => (config) => {
     config.headers = { ...config.headers, ...headers };
@@ -15,8 +18,8 @@ export const withParams = (params) => (config) => {
 export const withQuery = (query) => (config) => {
     config.query = { ...config.query, ...query };
 };
-export const withHeader = (key, value) => (config) => {
-    config.headers = { ...config.headers, [key]: value };
+export const withRoot = (root) => (config) => {
+    config.root = root;
 };
 export const combineOptions = (...options) => (config) => {
     options.forEach(option => option(config));
@@ -73,39 +76,24 @@ export class APIClient {
     async executeRequest(method, path, request, responseType, options = []) {
         this.checkRequestResponseName(request, responseType);
         const config = {
-            uri: path,
+            path,
             headers: {
                 'Content-Type': 'application/json'
             }
         };
         options.forEach(option => option(config));
-        let finalUri = config.uri;
-        if (config.params && Object.keys(config.params).length > 0) {
-            Object.entries(config.params).forEach(([key, value]) => {
-                const placeholder = `{${key}}`;
-                finalUri = finalUri.replace(placeholder, encodeURIComponent(value));
-            });
-        }
-        this.validateUri(finalUri);
-        if (config.query && Object.keys(config.query).length > 0) {
-            const queryString = Object.entries(config.query)
-                .filter(([_, value]) => value !== undefined && value !== null && value !== '')
-                .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-                .join('&');
-            if (queryString) {
-                finalUri += (finalUri.includes('?') ? '&' : '?') + queryString;
-            }
-        }
+        const root = getRootUri(this);
+        const finalUri = APIConfigURIBuilder
+            .from(config)
+            .withRoot(root)
+            .build();
         const httpBuilder = this.httpBuilder
             .setUri(finalUri)
             .setMethod(method);
         Object.entries(config.headers).forEach(([key, value]) => {
             httpBuilder.addHeader(key, value);
         });
-        if (request) {
-            const requestJson = JSON.stringify(instanceToPlain(request));
-            httpBuilder.setContent(requestJson);
-        }
+        httpBuilder.setContent(JSON.stringify(instanceToPlain(request)));
         const http = httpBuilder.build();
         const [response, error] = await http.send();
         if (error) {
@@ -117,12 +105,5 @@ export class APIClient {
         const responseData = JSON.parse(response);
         const result = plainToClass(responseType, responseData);
         return result;
-    }
-    validateUri(uri) {
-        const unresolved = uri.match(/\{[^}]+\}/g);
-        if (unresolved && unresolved.length > 0) {
-            const missingParams = unresolved.map(p => p.slice(1, -1));
-            throw new Error(`Missing path parameters: [${missingParams.join(', ')}] in URI: "${uri}"`);
-        }
     }
 }

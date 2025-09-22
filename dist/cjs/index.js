@@ -21,10 +21,14 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HttpMethod = void 0;
+// Export shared types and interfaces
+__exportStar(require("./src/types"), exports);
 // Export shared rules and interfaces
 __exportStar(require("./src/rules"), exports);
 // Export HTTP API decorators (核心功能)
 __exportStar(require("./src/decorators"), exports);
+// Export URI builder utilities
+__exportStar(require("./src/uri-builder"), exports);
 // Export base client and utilities
 __exportStar(require("./src/client"), exports);
 // Export runtime rule checking utilities

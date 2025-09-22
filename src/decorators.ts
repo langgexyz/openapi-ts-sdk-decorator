@@ -6,7 +6,8 @@ import 'reflect-metadata';
 import { HttpMethod } from 'openapi-ts-sdk';
 import { plainToClass } from 'class-transformer';
 import { validate } from 'class-validator';
-import { APIOption, withParams, withQuery } from './client';
+import { APIOption } from './types';
+import { withParams, withQuery } from './client';
 
 const DECORATOR_NAMESPACE = '__openapi_ts_sdk_decorator_';
 const API_METHODS_KEY = `${DECORATOR_NAMESPACE}apiMethods`;

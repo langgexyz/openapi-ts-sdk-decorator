@@ -3,13 +3,16 @@
  * Base API Client for OpenAPI TypeScript SDK
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.APIClient = exports.combineOptions = exports.withHeader = exports.withQuery = exports.withParams = exports.withHeaders = exports.withUri = void 0;
+exports.APIClient = exports.combineOptions = exports.withRoot = exports.withQuery = exports.withParams = exports.withHeaders = exports.withPath = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
-const withUri = (uri) => (config) => {
-    config.uri = uri;
+const decorators_1 = require("./decorators");
+const uri_builder_1 = require("./uri-builder");
+// === API Option 助手函数 ===
+const withPath = (path) => (config) => {
+    config.path = path;
 };
-exports.withUri = withUri;
+exports.withPath = withPath;
 const withHeaders = (headers) => (config) => {
     config.headers = { ...config.headers, ...headers };
 };
@@ -22,10 +25,10 @@ const withQuery = (query) => (config) => {
     config.query = { ...config.query, ...query };
 };
 exports.withQuery = withQuery;
-const withHeader = (key, value) => (config) => {
-    config.headers = { ...config.headers, [key]: value };
+const withRoot = (root) => (config) => {
+    config.root = root;
 };
-exports.withHeader = withHeader;
+exports.withRoot = withRoot;
 const combineOptions = (...options) => (config) => {
     options.forEach(option => option(config));
 };
@@ -82,39 +85,24 @@ class APIClient {
     async executeRequest(method, path, request, responseType, options = []) {
         this.checkRequestResponseName(request, responseType);
         const config = {
-            uri: path,
+            path,
             headers: {
                 'Content-Type': 'application/json'
             }
         };
         options.forEach(option => option(config));
-        let finalUri = config.uri;
-        if (config.params && Object.keys(config.params).length > 0) {
-            Object.entries(config.params).forEach(([key, value]) => {
-                const placeholder = `{${key}}`;
-                finalUri = finalUri.replace(placeholder, encodeURIComponent(value));
-            });
-        }
-        this.validateUri(finalUri);
-        if (config.query && Object.keys(config.query).length > 0) {
-            const queryString = Object.entries(config.query)
-                .filter(([_, value]) => value !== undefined && value !== null && value !== '')
-                .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-                .join('&');
-            if (queryString) {
-                finalUri += (finalUri.includes('?') ? '&' : '?') + queryString;
-            }
-        }
+        const root = (0, decorators_1.getRootUri)(this);
+        const finalUri = uri_builder_1.APIConfigURIBuilder
+            .from(config)
+            .withRoot(root)
+            .build();
         const httpBuilder = this.httpBuilder
             .setUri(finalUri)
             .setMethod(method);
         Object.entries(config.headers).forEach(([key, value]) => {
             httpBuilder.addHeader(key, value);
         });
-        if (request) {
-            const requestJson = JSON.stringify((0, class_transformer_1.instanceToPlain)(request));
-            httpBuilder.setContent(requestJson);
-        }
+        httpBuilder.setContent(JSON.stringify((0, class_transformer_1.instanceToPlain)(request)));
         const http = httpBuilder.build();
         const [response, error] = await http.send();
         if (error) {
@@ -126,13 +114,6 @@ class APIClient {
         const responseData = JSON.parse(response);
         const result = (0, class_transformer_1.plainToClass)(responseType, responseData);
         return result;
-    }
-    validateUri(uri) {
-        const unresolved = uri.match(/\{[^}]+\}/g);
-        if (unresolved && unresolved.length > 0) {
-            const missingParams = unresolved.map(p => p.slice(1, -1));
-            throw new Error(`Missing path parameters: [${missingParams.join(', ')}] in URI: "${uri}"`);
-        }
     }
 }
 exports.APIClient = APIClient;
