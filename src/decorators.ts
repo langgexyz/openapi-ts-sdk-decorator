@@ -272,5 +272,37 @@ export function getAPIMethodsMetadata(target: any): APIMethodMetadata[] {
 }
 
 export function getRootUri(target: any): string | undefined {
-  return target[ROOT_URI_KEY];
+  // 🔧 修复原型链访问问题
+  
+  // 1. 先尝试从实例本身读取
+  if (target[ROOT_URI_KEY]) {
+    return target[ROOT_URI_KEY];
+  }
+  
+  // 2. 再尝试从实例的原型读取 (解决直接实例化的情况)
+  const proto = Object.getPrototypeOf(target);
+  if (proto && proto[ROOT_URI_KEY]) {
+    return proto[ROOT_URI_KEY];
+  }
+  
+  // 3. 最后尝试从构造函数的原型读取 (解决继承的情况)
+  if (target.constructor && target.constructor.prototype && target.constructor.prototype[ROOT_URI_KEY]) {
+    return target.constructor.prototype[ROOT_URI_KEY];
+  }
+  
+  // 4. 处理多层继承：遍历原型链
+  let currentProto = proto;
+  while (currentProto) {
+    if (currentProto[ROOT_URI_KEY]) {
+      return currentProto[ROOT_URI_KEY];
+    }
+    currentProto = Object.getPrototypeOf(currentProto);
+    
+    // 避免无限循环，到达 Object.prototype 时停止
+    if (currentProto === Object.prototype || currentProto === null) {
+      break;
+    }
+  }
+  
+  return undefined;
 }
