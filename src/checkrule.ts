@@ -10,38 +10,15 @@ import { getAPIMethodsMetadata, getRootUri, type APIMethodMetadata } from './dec
 // Re-export types for convenience
 export type { ValidationResult };
 
-export interface CheckRuleOptions {
-  /**
-   * 启用方法命名验证
-   * @default true
-   */
-  enableNamingValidation?: boolean;
-  
-  /**
-   * 启用类型名称验证
-   * 注意：由于TypeScript类型擦除，此功能在运行时有限
-   * @default true
-   */
-  enableTypeValidation?: boolean;
-  
-  /**
-   * 启用参数验证
-   * @default true 
-   */
-  enableParameterValidation?: boolean;
-  
-  /**
-   * 检查根URI配置
-   * @default true
-   */
-  checkRootUri?: boolean;
-  
-  /**
-   * 要求API方法有文档注释
-   * @default false
-   */
-  requireDocumentation?: boolean;
-  
+import type { APIClientOptions } from './client';
+
+export interface CheckRuleOptions extends Pick<APIClientOptions, 
+  'enableNamingValidation' | 
+  'enableTypeValidation' | 
+  'enableParameterValidation' | 
+  'enableRootUriCheck' | 
+  'requireDocumentation'
+> {
   /**
    * 模块上下文，用于获取真实的类型构造函数
    * 传入对应的模块对象（如 Auth, User 等），以便进行准确的类型验证
@@ -80,7 +57,7 @@ export function checkRule(
     enableNamingValidation = true,
     enableTypeValidation = true,
     enableParameterValidation = true,
-    checkRootUri = true,
+    enableRootUriCheck = true,
     requireDocumentation = false,
     moduleContext
   } = options || {};
@@ -102,7 +79,7 @@ export function checkRule(
     }
 
     // 1. 检查Root URI配置
-    if (checkRootUri) {
+    if (enableRootUriCheck) {
       const rootUri = getRootUri(client);
       if (!rootUri) {
         errors.push('Missing @RootUri decorator on client class');

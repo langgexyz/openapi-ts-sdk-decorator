@@ -160,7 +160,9 @@ function createHttpMethodDecorator(method) {
                 const rawResponse = await this.executeRequest(method.toUpperCase(), path, processedRequest, responseType, generatedOptions);
                 if (responseType && typeof responseType === 'function') {
                     const transformedResponse = plainToClass(responseType, rawResponse);
-                    if (transformedResponse && typeof transformedResponse === 'object') {
+                    // 检查是否启用响应验证
+                    const shouldValidateResponse = this.options?.enableResponseValidation !== false;
+                    if (transformedResponse && typeof transformedResponse === 'object' && shouldValidateResponse) {
                         const errors = await validate(transformedResponse);
                         if (errors.length > 0) {
                             console.warn('Response validation warnings:', errors);

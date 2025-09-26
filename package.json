@@ -1,6 +1,6 @@
 {
   "name": "openapi-ts-sdk-decorator",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "OpenAPI TypeScript SDK decorators with parameter-based design - provides type-safe decorator system with automatic path/query parameter handling",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",

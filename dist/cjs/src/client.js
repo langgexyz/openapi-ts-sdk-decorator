@@ -34,25 +34,57 @@ const combineOptions = (...options) => (config) => {
 };
 exports.combineOptions = combineOptions;
 class APIClient {
-    constructor(httpBuilder) {
+    constructor(httpBuilder, options = {}) {
         this.httpBuilder = httpBuilder;
+        this.options = {
+            // 运行时验证配置
+            enableTypeValidation: process.env.NODE_ENV !== 'production',
+            enableRequestValidation: true,
+            enableResponseValidation: process.env.NODE_ENV !== 'production',
+            // 开发时检查配置
+            enableNamingValidation: process.env.NODE_ENV !== 'production',
+            enableParameterValidation: process.env.NODE_ENV !== 'production',
+            enableRootUriCheck: process.env.NODE_ENV !== 'production',
+            requireDocumentation: false,
+            ...options
+        };
     }
     async validateRequest(request) {
+        // 如果禁用请求验证，直接返回
+        if (!this.options.enableRequestValidation) {
+            return;
+        }
         if (!request || typeof request !== 'object') {
             throw new Error('Request parameter must be an object');
         }
-        const errors = await (0, class_validator_1.validate)(request);
-        if (errors.length > 0) {
-            const errorDetails = errors.map(error => {
-                const property = error.property || 'unknown';
-                const constraints = error.constraints || {};
-                const messages = Object.values(constraints).join(', ');
-                return `${property}: ${messages}`;
-            }).join('; ');
-            throw new Error(`Request validation failed: ${errorDetails}`);
+        try {
+            const errors = await (0, class_validator_1.validate)(request);
+            if (errors.length > 0) {
+                const errorDetails = errors.map(error => {
+                    const property = error.property || 'unknown';
+                    const constraints = error.constraints || {};
+                    const messages = Object.values(constraints).join(', ');
+                    return `${property}: ${messages}`;
+                }).join('; ');
+                throw new Error(`Request validation failed: ${errorDetails}`);
+            }
+        }
+        catch (error) {
+            // 如果对象没有验证装饰器，class-validator 会抛出错误
+            // 对于普通对象，我们只进行基本类型检查，不进行详细验证
+            if (error instanceof Error && error.message.includes('unknown value was passed to the validate function')) {
+                // 对于普通对象，通过基本类型检查即可
+                return;
+            }
+            // 重新抛出其他验证错误
+            throw error;
         }
     }
     checkRequestResponseName(request, responseType) {
+        // 如果禁用类型验证，直接返回
+        if (!this.options.enableTypeValidation) {
+            return;
+        }
         const REQUEST = 'Request';
         const RESPONSE = 'Response';
         if (!request || (typeof request === 'object' && Object.keys(request).length === 0 && request.constructor === Object)) {

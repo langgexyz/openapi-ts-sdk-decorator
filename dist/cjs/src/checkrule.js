@@ -30,7 +30,7 @@ const decorators_1 = require("./decorators");
  * ```
  */
 function checkRule(client, options) {
-    const { enableNamingValidation = true, enableTypeValidation = true, enableParameterValidation = true, checkRootUri = true, requireDocumentation = false, moduleContext } = options || {};
+    const { enableNamingValidation = true, enableTypeValidation = true, enableParameterValidation = true, enableRootUriCheck = true, requireDocumentation = false, moduleContext } = options || {};
     const errors = [];
     const suggestions = [];
     try {
@@ -45,7 +45,7 @@ function checkRule(client, options) {
             };
         }
         // 1. 检查Root URI配置
-        if (checkRootUri) {
+        if (enableRootUriCheck) {
             const rootUri = (0, decorators_1.getRootUri)(client);
             if (!rootUri) {
                 errors.push('Missing @RootUri decorator on client class');

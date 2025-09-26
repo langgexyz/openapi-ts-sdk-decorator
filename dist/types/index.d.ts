@@ -9,6 +9,7 @@ export * from './src/rules';
 export * from './src/decorators';
 export * from './src/uri-builder';
 export * from './src/client';
+export type { APIClientOptions } from './src/client';
 export * from './src/checkrule';
 export { HttpMethod } from 'openapi-ts-sdk';
 //# sourceMappingURL=index.d.ts.map

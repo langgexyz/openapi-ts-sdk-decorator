@@ -19,6 +19,7 @@ export * from './src/uri-builder';
 
 // Export base client and utilities
 export * from './src/client';
+export type { APIClientOptions } from './src/client';
 
 // Export runtime rule checking utilities
 export * from './src/checkrule';
